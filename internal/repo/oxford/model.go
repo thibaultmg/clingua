@@ -6,6 +6,7 @@ type EntriesResponse struct {
 	Results  []Results `json:"results"`
 	Word     string    `json:"word"`
 }
+
 type Metadata struct {
 	Operation string `json:"operation"`
 	Provider  string `json:"provider"`

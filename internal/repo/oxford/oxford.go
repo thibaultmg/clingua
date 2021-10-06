@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strings"
 
 	"github.com/thibaultmg/clingua/internal/card"
 	"github.com/thibaultmg/clingua/internal/entity"
@@ -20,7 +21,7 @@ type Repo struct {
 	client  *http.Client
 }
 
-func New(baseUrl, appID, appKey string) (Repo, error) {
+func New(client *http.Client, baseUrl, appID, appKey string) (Repo, error) {
 	u, err := url.Parse(baseUrl)
 	if err != nil {
 		return Repo{}, err
@@ -30,19 +31,28 @@ func New(baseUrl, appID, appKey string) (Repo, error) {
 		baseUrl: u,
 		appID:   appID,
 		appKey:  appKey,
-		client:  &http.Client{},
+		client:  client,
 	}, nil
 }
 
 func (r Repo) Get(ctx context.Context, word string, lang language.Tag, pos entity.PartOfSpeech) ([]card.DefinitionEntry, error) {
 	var ret []card.DefinitionEntry
 
-	queryString := fmt.Sprintf("fields=definitions,domains,examples,pronunciations,registers&strictMatch=false")
-	if !pos.IsAny() {
-		queryString = queryString + fmt.Sprintf("&lexicalCategory=%s", pos)
+	var reqUrl strings.Builder
+
+	baseQueryString := "fields=definitions,domains,examples,pronunciations,registers&strictMatch=false"
+
+	if _, err := fmt.Fprintf(&reqUrl, "/entries/%s/%s?%s", lang, word, baseQueryString); err != nil {
+		panic(err)
 	}
 
-	uriRef, err := url.Parse(fmt.Sprintf("/entries/%s/%s?%s", lang, word, queryString))
+	if !pos.IsAny() {
+		if _, err := fmt.Fprintf(&reqUrl, "&lexicalCategory=%s", pos); err != nil {
+			panic(err)
+		}
+	}
+
+	uriRef, err := url.Parse(reqUrl.String())
 	if err != nil {
 		return ret, err
 	}
@@ -63,39 +73,21 @@ func (r Repo) Get(ctx context.Context, word string, lang language.Tag, pos entit
 
 	defer resp.Body.Close()
 
+	if resp.StatusCode != http.StatusOK {
+		return ret, fmt.Errorf("http request failed with status %v and message: %s", resp.StatusCode, resp.Body)
+	}
+
 	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return ret, err
+	}
+
 	var entries EntriesResponse
 	if err := json.Unmarshal(body, &entries); err != nil {
 		return ret, err
 	}
 
-	for _, r := range entries.Results {
-		for _, le := range r.LexicalEntries {
-			for _, e := range le.Entries {
-				for _, s := range e.Senses {
-					newEntry := card.DefinitionEntry{
-						Definition:   s.Definitions[0],
-						PartOfSpeech: entity.ParsePartOfSpeech(le.LexicalCategory.Text),
-					}
-
-					for _, ex := range s.Examples {
-						newEntry.Exemples = append(newEntry.Exemples, ex.Text)
-					}
-
-					for _, reg := range s.Registers {
-						newEntry.Registers = append(newEntry.Registers, reg.Text)
-					}
-
-					// for _, sub := range s.Subsenses {
-					// 	newEntry.Domains = append(newEntry.Domains, sub.Domains)
-					// }
-
-					ret = append(ret, newEntry)
-
-				}
-			}
-		}
-	}
+	ret = response2Internal(entries)
 
 	return ret, nil
 }
