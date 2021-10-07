@@ -28,7 +28,7 @@ func (u UseCaseImpl) Create(ctx context.Context, title string, pos entity.PartOf
 		log.Panicln(err)
 	}
 
-	ret.Definition = definition
+	ret.Definition = definition[0].Definition
 
 	return ret, nil
 }

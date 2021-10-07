@@ -1,6 +1,12 @@
 package entity
 
-import "strings"
+import (
+	"errors"
+	"fmt"
+	"strings"
+)
+
+var ErrInvalidPartOfSpeech = errors.New("Invalid Part Of Speech")
 
 type PartOfSpeech int
 
@@ -43,25 +49,25 @@ func (p PartOfSpeech) String() string {
 	return ""
 }
 
-func ParsePartOfSpeech(pos string) PartOfSpeech {
+func ParsePartOfSpeech(pos string) (PartOfSpeech, error) {
 	switch strings.ToLower(pos) {
 	case "noun":
-		return Noun
+		return Noun, nil
 	case "pronoun":
-		return Pronoun
+		return Pronoun, nil
 	case "verb":
-		return Verb
+		return Verb, nil
 	case "adjective":
-		return Adjective
+		return Adjective, nil
 	case "adverb":
-		return Adverb
+		return Adverb, nil
 	case "preposition":
-		return Preposition
+		return Preposition, nil
 	case "conjunction":
-		return Conjunction
+		return Conjunction, nil
 	case "interjection":
-		return Interjection
+		return Interjection, nil
 	}
 
-	return 0
+	return 0, fmt.Errorf("Error with value %s: %w", pos, ErrInvalidPartOfSpeech)
 }

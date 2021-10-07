@@ -20,6 +20,7 @@ type UseCase interface {
 
 type DefinitionEntry struct {
 	Definition   string
+	Provider     string
 	PartOfSpeech entity.PartOfSpeech
 	Exemples     []string
 	Domains      []string
