@@ -9,8 +9,8 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/thibaultmg/clingua/internal/card"
 	"github.com/thibaultmg/clingua/internal/entity"
+	"github.com/thibaultmg/clingua/internal/usecase/card"
 	"golang.org/x/text/language"
 )
 
@@ -35,7 +35,7 @@ func New(client *http.Client, baseUrl, appID, appKey string) (Repo, error) {
 	}, nil
 }
 
-func (r Repo) Get(ctx context.Context, word string, lang language.Tag, pos entity.PartOfSpeech) ([]card.DefinitionEntry, error) {
+func (r Repo) GetDefinition(ctx context.Context, word string, lang language.Tag, pos entity.PartOfSpeech) ([]card.DefinitionEntry, error) {
 	var ret []card.DefinitionEntry
 
 	var reqUrl strings.Builder

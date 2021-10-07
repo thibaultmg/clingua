@@ -4,8 +4,8 @@ import (
 	"log"
 	"strings"
 
-	"github.com/thibaultmg/clingua/internal/card"
 	"github.com/thibaultmg/clingua/internal/entity"
+	"github.com/thibaultmg/clingua/internal/usecase/card"
 )
 
 func response2Internal(response EntriesResponse) []card.DefinitionEntry {

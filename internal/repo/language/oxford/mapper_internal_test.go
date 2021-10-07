@@ -25,6 +25,7 @@ func TestOxford_Mapper_Nominal(t *testing.T) {
 	assert.Len(internal[0].Exemples, 1)
 	assert.Equal("he can ace opponents with serves of no more than 62 mph", internal[0].Exemples[0])
 	assert.Equal("informal", internal[0].Registers[0])
+	assert.Equal("Oxford University Press", internal[0].Provider)
 
 	// Check second item
 	assert.Equal("achieve high marks in (a test or exam)", internal[1].Definition)
