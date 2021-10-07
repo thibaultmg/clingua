@@ -2,33 +2,30 @@ package card
 
 import (
 	"context"
-	"log"
 
 	"github.com/thibaultmg/clingua/internal/entity"
 )
 
-type UseCaseImpl struct {
+type CardUCImpl struct {
 	cardRepo CardRepo
-	defRepo  DefinitionRepo
 }
 
-func NewUseCase(cardRepo CardRepo, defRepo DefinitionRepo) UseCase {
-	return UseCaseImpl{
+func NewUseCase(cardRepo CardRepo) CardUC {
+	return CardUCImpl{
 		cardRepo: cardRepo,
-		defRepo:  defRepo,
 	}
 }
 
-func (u UseCaseImpl) Create(ctx context.Context, title string, pos entity.PartOfSpeech) (entity.Card, error) {
+func (u CardUCImpl) Create(ctx context.Context, title string, pos entity.PartOfSpeech) (entity.Card, error) {
 	ret := entity.NewCard()
 
-	// Get definition
-	definition, err := u.defRepo.Get(ctx, title, pos)
-	if err != nil {
-		log.Panicln(err)
-	}
+	// // Get definition
+	// definition, err := u.defRepo.GetDefinition(ctx, title, pos)
+	// if err != nil {
+	// 	log.Panicln(err)
+	// }
 
-	ret.Definition = definition[0].Definition
+	// ret.Definition = definition[0].Definition
 
 	return ret, nil
 }

@@ -5,11 +5,11 @@ import (
 	"strings"
 
 	"github.com/thibaultmg/clingua/internal/entity"
-	"github.com/thibaultmg/clingua/internal/usecase/card"
+	"github.com/thibaultmg/clingua/internal/usecase/language"
 )
 
-func response2Internal(response EntriesResponse) []card.DefinitionEntry {
-	var ret []card.DefinitionEntry
+func response2Internal(response EntriesResponse) []language.DefinitionEntry {
+	var ret []language.DefinitionEntry
 
 	for _, r := range response.Results {
 		for _, le := range r.LexicalEntries {
@@ -20,7 +20,7 @@ func response2Internal(response EntriesResponse) []card.DefinitionEntry {
 						log.Printf("Error with sense %#v: ", s)
 					}
 
-					newEntry := card.DefinitionEntry{
+					newEntry := language.DefinitionEntry{
 						Definition:   s.Definitions[0],
 						PartOfSpeech: pos,
 					}

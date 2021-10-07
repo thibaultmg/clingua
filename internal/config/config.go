@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/spf13/viper"
+	"golang.org/x/text/language"
 )
 
 func InitConfig(cfgFile string) {
@@ -35,6 +36,13 @@ func GetOxfordRepo() (url, appID, appKey string) {
 	url = viper.GetString("oxford.url")
 	appID = viper.GetString("oxford.appID")
 	appKey = viper.GetString("oxford.appKey")
+
+	return
+}
+
+func GetLanguages() (from, to language.Tag) {
+	from = language.MustParse(viper.GetString("fromLanguage"))
+	to = language.MustParse(viper.GetString("toLanguage"))
 
 	return
 }

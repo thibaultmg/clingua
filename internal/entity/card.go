@@ -10,13 +10,13 @@ type Exemple struct {
 }
 
 type Card struct {
-	From       language.Tag // Learner's language
-	To         language.Tag // Learned language
-	ID         string
-	Title      string
-	Pos        PartOfSpeech
-	Definition string
-	Exemples   []Exemple
+	From         language.Tag // Learner's language
+	To           language.Tag // Learned language
+	ID           string
+	Title        string
+	PartOfSpeech PartOfSpeech
+	Definition   string
+	Exemples     []Exemple
 }
 
 func NewCard() Card {

@@ -7,3 +7,6 @@ build:
 
 run.create: build
 	./dist/clingua -c $(PWD)/resources/.clingua.yaml create ace
+
+run.version: build
+	./dist/clingua -c $(PWD)/resources/.clingua.yaml --version

@@ -1,6 +1,7 @@
 package oxford
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -10,7 +11,7 @@ import (
 	"strings"
 
 	"github.com/thibaultmg/clingua/internal/entity"
-	"github.com/thibaultmg/clingua/internal/usecase/card"
+	languageuc "github.com/thibaultmg/clingua/internal/usecase/language"
 	"golang.org/x/text/language"
 )
 
@@ -19,9 +20,10 @@ type Repo struct {
 	appID   string
 	appKey  string
 	client  *http.Client
+	toLang  language.Tag
 }
 
-func New(client *http.Client, baseUrl, appID, appKey string) (Repo, error) {
+func New(client *http.Client, baseUrl, appID, appKey string, to language.Tag) (Repo, error) {
 	u, err := url.Parse(baseUrl)
 	if err != nil {
 		return Repo{}, err
@@ -32,17 +34,18 @@ func New(client *http.Client, baseUrl, appID, appKey string) (Repo, error) {
 		appID:   appID,
 		appKey:  appKey,
 		client:  client,
+		toLang:  to,
 	}, nil
 }
 
-func (r Repo) GetDefinition(ctx context.Context, word string, lang language.Tag, pos entity.PartOfSpeech) ([]card.DefinitionEntry, error) {
-	var ret []card.DefinitionEntry
+func (r Repo) GetDefinition(ctx context.Context, word string, pos entity.PartOfSpeech) ([]languageuc.DefinitionEntry, error) {
+	var ret []languageuc.DefinitionEntry
 
 	var reqUrl strings.Builder
 
 	baseQueryString := "fields=definitions,domains,examples,pronunciations,registers&strictMatch=false"
 
-	if _, err := fmt.Fprintf(&reqUrl, "/entries/%s/%s?%s", lang, word, baseQueryString); err != nil {
+	if _, err := fmt.Fprintf(&reqUrl, "/api/v2/entries/%s/%s?%s", r.toLang, word, baseQueryString); err != nil {
 		panic(err)
 	}
 
@@ -74,13 +77,21 @@ func (r Repo) GetDefinition(ctx context.Context, word string, lang language.Tag,
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return ret, fmt.Errorf("http request failed with status %v and message: %s", resp.StatusCode, resp.Body)
+		buf := new(bytes.Buffer)
+		buf.ReadFrom(resp.Body)
+		return ret, fmt.Errorf("http request %v failed with status %v and message: %s", req.URL, resp.StatusCode, buf.String())
 	}
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return ret, err
 	}
+
+	// uncomment for debug purpose
+	// err = os.WriteFile("response.json", []byte(body), 0666)
+	// if err != nil {
+	// 	log.Fatal(err)
+	// }
 
 	var entries EntriesResponse
 	if err := json.Unmarshal(body, &entries); err != nil {
