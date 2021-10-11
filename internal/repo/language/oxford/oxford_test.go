@@ -34,10 +34,10 @@ func TestOxford_Nominal(t *testing.T) {
 	defer server.Close()
 
 	// Test repo with mocked server
-	oxRep, err := oxford.New(server.Client(), server.URL, "appid", "appkey")
+	oxRep, err := oxford.New(server.Client(), server.URL, "appid", "appkey", language.English)
 	assert.Nil(err)
 
-	res, err := oxRep.Get(context.Background(), word, language.English, entity.Any)
+	res, err := oxRep.GetDefinition(context.Background(), word, entity.Any)
 	assert.Nil(err)
 	assert.Len(res, 2)
 }

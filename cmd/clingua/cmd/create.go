@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -25,8 +26,14 @@ var createCmd = &cobra.Command{
 		_, toLanguage := config.GetLanguages()
 		dict := language.NewDictionnary(toLanguage)
 		luc := languageuc.New(dict)
-		cardPresenter := card.New(luc)
 
-		cardPresenter.CreateCard(strings.Join(args, " "), entity.Any)
+		c := entity.NewCard()
+		c.Title = strings.Join(args, " ")
+		cardEditor := card.NewCardEditor(c, luc)
+
+		cardPresenter := card.NewCardFSM(cardEditor)
+
+		cardPresenter.Run()
+		fmt.Println("bye bye")
 	},
 }
