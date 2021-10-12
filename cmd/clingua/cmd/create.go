@@ -23,15 +23,16 @@ var createCmd = &cobra.Command{
 	Long:  `Interactive command to create a vocabulary card, selecting definition and exemples`,
 	Args:  cobra.MinimumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		_, toLanguage := config.GetLanguages()
-		dict := language.NewDictionnary(toLanguage)
-		luc := languageuc.New(dict)
+		fromLang, toLang := config.GetLanguages()
+		dict := language.NewDictionnary(toLang)
+		trans := language.NewTranslator(toLang, fromLang)
+		luc := languageuc.New(dict, trans)
 
 		c := entity.NewCard()
 		c.Title = strings.Join(args, " ")
-		cardEditor := card.NewCardEditor(c, luc)
+		cardEditor := card.NewCardEditor(&c, luc)
 
-		cardPresenter := card.NewCardFSM(cardEditor)
+		cardPresenter := card.NewCardCLI(cardEditor)
 
 		cardPresenter.Run()
 		fmt.Println("bye bye")

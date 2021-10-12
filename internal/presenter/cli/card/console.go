@@ -58,16 +58,22 @@ func (c console) Prompt(label, defaultVal string) (string, error) {
 	return res, mapError(err)
 }
 
-func (c console) Busy(done <-chan struct{}) {
-	for {
-		c.writer.WriteString(".")
-		select {
-		case <-done:
-			return
-		default:
+func (c console) Busy(done <-chan struct{}) <-chan struct{} {
+	ret := make(chan struct{})
+	go func() {
+		defer close(ret)
+		for {
+			c.writer.WriteString(".")
+			select {
+			case <-done:
+				return
+			default:
+			}
+			time.Sleep(1 * time.Second)
 		}
-		time.Sleep(1 * time.Second)
-	}
+	}()
+
+	return ret
 }
 
 func mapError(err error) error {

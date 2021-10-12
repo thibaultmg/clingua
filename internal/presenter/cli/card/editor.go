@@ -2,6 +2,7 @@ package card
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -13,34 +14,19 @@ import (
 	"github.com/thibaultmg/clingua/internal/usecase/language"
 )
 
+var getDefinitionsTimeout = 10 * time.Second
+var getTranslationsTimeout = 15 * time.Second
+
 type CardField int
 
 const (
-	TitleField CardField = iota + 1
+	NoField CardField = iota
+	TitleField
 	DefinitionField
-	TranslationsField
-	ExemplesField
+	TranslationField
+	ExempleField
+	TranslatedExempleField
 )
-
-func (c CardField) getValue(card *entity.Card) string {
-	switch c {
-	case TitleField:
-		return card.Title
-	case DefinitionField:
-		return card.Definition
-	}
-
-	return ""
-}
-
-func (c CardField) setValue(card *entity.Card, val string) {
-	switch c {
-	case TitleField:
-		card.Title = val
-	case DefinitionField:
-		card.Definition = val
-	}
-}
 
 func (c CardField) String() string {
 	switch c {
@@ -48,29 +34,40 @@ func (c CardField) String() string {
 		return "Title"
 	case DefinitionField:
 		return "Definition"
-	case TranslationsField:
+	case TranslationField:
 		return "Translations"
-	case ExemplesField:
+	case ExempleField:
 		return "Exemples"
 	default:
-		fmt.Println("card field", int(c))
+		// fmt.Println("card field", int(c))
 		return ""
+	}
+}
+
+func (c CardField) Next() (CardField, bool) {
+	switch c {
+	case TitleField:
+		return DefinitionField, true
+	case DefinitionField:
+		return TranslationField, true
+	case TranslationField:
+		return ExempleField, true
+	default:
+		return NoField, false
 	}
 }
 
 type CardEditor struct {
 	card     *entity.Card
-	console  console
-	language language.LanguageUC
 	cache    map[string]interface{}
+	language language.LanguageUC
 }
 
-func NewCardEditor(card entity.Card, lang language.LanguageUC) *CardEditor {
+func NewCardEditor(card *entity.Card, lang language.LanguageUC) *CardEditor {
 	return &CardEditor{
-		card:     &card,
-		language: lang,
-		console:  newConsole(os.Stdout),
+		card:     card,
 		cache:    make(map[string]interface{}),
+		language: lang,
 	}
 }
 
@@ -78,114 +75,205 @@ func (c *CardEditor) GetCard() *entity.Card {
 	return c.card
 }
 
-func (c *CardEditor) EditField(field CardField) error {
-
-	result, err := c.console.Prompt(field.String(), field.getValue(c.card))
-	if err != nil {
-		return err
-	}
-
-	field.setValue(c.card, result)
-	return nil
-}
-
-func (c *CardEditor) PrintField(field CardField) error {
-	t := template.New(field.String())
-
+func (c *CardEditor) GetField(field CardField, index int) string {
 	switch field {
-	case DefinitionField:
-		t = template.Must(t.Parse(definitionTemplate))
 	case TitleField:
-		t = template.Must(t.Parse(titleTemplate))
+		return c.card.Title
+	case DefinitionField:
+		return c.card.Definition
+	case TranslationField:
+		if index >= len(c.card.Translations) {
+			log.Debug().Msgf("invalid index %d for translations", index)
+			return ""
+		}
+		return c.card.Translations[index]
+	case ExempleField:
+		if index >= len(c.card.Exemples) {
+			log.Debug().Msgf("invalid index %d for exemples", index)
+			return ""
+		}
+		return c.card.Exemples[index].Sentence
+	case TranslatedExempleField:
+		if index >= len(c.card.Exemples) {
+			log.Debug().Msgf("invalid index %d for exemples", index)
+			return ""
+		}
+		return c.card.Exemples[index].Translation
+	default:
+		return ""
 	}
-
-	return t.Execute(os.Stdout, c.card)
 }
 
-func (c *CardEditor) SelectProposition(field CardField) error {
-	// fmt.Println("coucou from showFieldPropositions")
+func (c *CardEditor) SetField(field CardField, index int, val string) error {
 	switch field {
+	case TitleField:
+		c.card.Title = val
 	case DefinitionField:
-		val, err := c.proposeDefinitions()
-		if err != nil {
-			log.Warn().Msgf("Unable to fetch definitions: %v", err)
-			// c.sendEvent(setFieldEvent.String())
-			return err
-		}
 		c.card.Definition = val
+	case TranslationField:
+		if index > len(c.card.Translations) {
+			log.Debug().Msgf("invalid index %d for translations", index)
+		} else if index == len(c.card.Translations) || len(c.card.Translations) == 0 {
+			c.card.Translations = append(c.card.Translations, val)
+		} else {
+			c.card.Translations[index] = val
+		}
+	case ExempleField:
+		// TODO: handle index
+		c.card.Exemples[index].Sentence = val
+	case TranslatedExempleField:
+		// TODO: handle index
+		c.card.Exemples[index].Translation = val
+	default:
+		return fmt.Errorf("invalid index %d on field %s", index, field)
 	}
 
 	return nil
 }
 
-func (c *CardEditor) proposeDefinitions() (string, error) {
-	var def []language.DefinitionEntry
+func (c CardEditor) Print(field CardField) {
+	tFuncs := template.FuncMap{
+		"join": strings.Join,
+	}
 
-	// // To Delete
-	// mockDef := []language.DefinitionEntry{
-	// 	{
-	// 		PartOfSpeech: entity.Interjection,
-	// 		Definition:   "this is a definition",
-	// 		Registers:    []string{"slang", "formal"},
-	// 		Domains:      []string{"sport", "tennis"},
-	// 		Provider:     "oxford",
-	// 	},
-	// 	{
-	// 		PartOfSpeech: entity.Any,
-	// 		Definition:   "this is a definition",
-	// 	},
-	// }
-	// c.cache["definition"] = mockDef
+	var t *template.Template
+	switch field {
+	case NoField:
+		t = template.Must(template.New("card").Funcs(tFuncs).Parse(cardTemplate))
+	case TitleField:
+		t = template.Must(template.New("title").Parse(titleTemplate))
+	case DefinitionField:
+		t = template.Must(template.New("definition").Parse(definitionTemplate))
+	case TranslationField:
+		t = template.Must(template.New("translation").Funcs(tFuncs).Parse(translationTemplate))
+	}
 
-	// Check cache
-	cacheVal, ok := c.cache["definition"]
+	t.Execute(os.Stdout, c.card)
+}
+
+func (c *CardEditor) GetPropositions(field CardField, index int) ([]string, error) {
+	switch field {
+	case DefinitionField:
+		return c.getDefinitions()
+	case TranslationField:
+		return c.getTranslations()
+	default:
+		return []string{}, fmt.Errorf("invalid field %s or index %d", field, index)
+
+	}
+}
+
+func (c *CardEditor) SetProposition(field CardField, index int) error {
+	switch field {
+	case DefinitionField:
+		cachekey := c.makeCacheKey(DefinitionField)
+		cacheVal, ok := c.cache[cachekey]
+		if !ok {
+			panic("invalid cache key" + cachekey)
+		}
+		defProps, ok := cacheVal.([]language.DefinitionEntry)
+		if !ok {
+			panic("invalid type assertion")
+		}
+		c.SetField(DefinitionField, 0, defProps[index].Definition)
+	case TranslationField:
+		cachekey := c.makeCacheKey(TranslationField)
+		cacheVal, ok := c.cache[cachekey]
+		if !ok {
+			panic("invalid cache key" + cachekey)
+		}
+		transProps, ok := cacheVal.([]string)
+		if !ok {
+			panic("invalid type assertion from card editor cache")
+		}
+		c.SetField(TranslationField, index, transProps[index])
+	case ExempleField:
+		return errors.New("not implemented")
+	case TranslatedExempleField:
+		return errors.New("not implemented")
+	default:
+		return errors.New("not implemented")
+	}
+
+	return nil
+}
+
+func (c *CardEditor) makeCacheKey(field CardField) string {
+	return field.String() + "_" + c.GetField(field, 0)
+}
+
+func (c *CardEditor) getDefinitions() ([]string, error) {
+	var defProps []language.DefinitionEntry
+	var ret []string
+
+	cachekey := c.makeCacheKey(DefinitionField)
+	cacheVal, ok := c.cache[cachekey]
 	if !ok {
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		ctx, cancel := context.WithTimeout(context.Background(), getDefinitionsTimeout)
 		defer cancel()
 
-		c.console.Busy(ctx.Done())
 		var err error
-		def, err = c.language.GetDefinition(ctx, c.card.Title, c.card.PartOfSpeech)
+		defProps, err = c.language.GetDefinition(ctx, c.card.Title, c.card.PartOfSpeech)
 		if err != nil {
-			return "", fmt.Errorf("failed to get definitions: %v", err)
+			return ret, fmt.Errorf("failed to get definitions: %v", err)
 		}
-		// Close channel for busy
-		cancel()
 
 		// Set cache
-		c.cache["definition"] = def
+		c.cache[cachekey] = defProps
 	} else {
-		def, ok = cacheVal.([]language.DefinitionEntry)
+		defProps, ok = cacheVal.([]language.DefinitionEntry)
+		if !ok {
+			panic("invalid type assertion")
+		}
+	}
+
+	// Format props for screen print
+	var s strings.Builder
+	tFuncs := template.FuncMap{
+		"join": strings.Join,
+		"add":  func(i, j int) int { return i + j },
+	}
+
+	t := template.Must(template.New("definitions").Funcs(tFuncs).Parse(definitionPropsTemplate))
+	err := t.Execute(&s, defProps)
+	if err != nil {
+		return ret, fmt.Errorf("unable to apply definition template: %v", err)
+	}
+
+	ret = make([]string, 0, len(defProps))
+	splittedDefs := strings.Split(s.String(), "\n")
+	for _, val := range splittedDefs {
+		if len(strings.TrimSpace(val)) > 0 {
+			ret = append(ret, val)
+		}
+	}
+
+	return ret, nil
+}
+
+func (c *CardEditor) getTranslations() ([]string, error) {
+	var ret []string
+	cachekey := c.makeCacheKey(TranslationField)
+
+	cacheVal, ok := c.cache[cachekey]
+	if !ok {
+		ctx, cancel := context.WithTimeout(context.Background(), getTranslationsTimeout)
+		defer cancel()
+
+		var err error
+		ret, err = c.language.GetTranslation(ctx, c.card.Title, c.card.PartOfSpeech)
+		if err != nil {
+			return ret, fmt.Errorf("failed to get translations: %v", err)
+		}
+
+		// Set cache
+		c.cache[cachekey] = ret
+	} else {
+		ret, ok = cacheVal.([]string)
 		if !ok {
 			panic("invalid type assertion from card editor cache")
 		}
 	}
 
-	funcs := template.FuncMap{"join": strings.Join}
-	funcs["add"] = func(i, j int) int { return i + j }
-	t := template.Must(template.New("definitions").Funcs(funcs).Parse(definitionPropsTemplate))
-	var s strings.Builder
-	t.Execute(&s, def)
-	splittedDefs := strings.Split(s.String(), "\n")
-	items := make([]string, 0, len(splittedDefs))
-	for _, val := range splittedDefs {
-		if len(strings.TrimSpace(val)) > 0 {
-			items = append(items, val)
-		}
-	}
-
-	label := "Select the definition"
-	if len(def) > 0 && len(def[0].Provider) > 0 {
-		label = label + " from " + def[0].Provider
-	}
-	resultIdx, err := c.console.Select(label, items)
-	if err != nil {
-		return "", fmt.Errorf("failed to get selected definition from prompt: %v", err)
-	}
-
-	if len(def) <= resultIdx {
-		return "", fmt.Errorf("invalid index in slice of definitions propositions: %d", resultIdx)
-	}
-
-	return def[resultIdx].Definition, nil
+	return ret, nil
 }

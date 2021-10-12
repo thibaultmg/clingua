@@ -6,7 +6,7 @@ build:
 	go build -o dist -ldflags='-X "github.com/thibaultmg/clingua/cmd/clingua/cmd.ClinguaVersion=v0.0.0-$(GIT_SHORT_COMMIT)"' ./cmd/clingua
 
 run.create: build
-	./dist/clingua -c $(PWD)/resources/.clingua.yaml create ace
+	./dist/clingua -c $(PWD)/resources/.clingua.yaml create car
 
 run.version: build
 	./dist/clingua -c $(PWD)/resources/.clingua.yaml --version

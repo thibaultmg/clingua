@@ -40,6 +40,13 @@ func GetOxfordRepo() (url, appID, appKey string) {
 	return
 }
 
+func GetDeeplRepo() (url, authKey string) {
+	url = viper.GetString("deepl.url")
+	authKey = viper.GetString("deepl.authKey")
+
+	return
+}
+
 func GetLanguages() (from, to language.Tag) {
 	from = language.MustParse(viper.GetString("fromLanguage"))
 	to = language.MustParse(viper.GetString("toLanguage"))

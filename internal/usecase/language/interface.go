@@ -13,11 +13,12 @@ type Dictionnary interface {
 }
 
 type Translator interface {
-	GetTranslation(context.Context, string, entity.PartOfSpeech, string, string) ([]DefinitionEntry, error)
+	GetTranslation(context.Context, string, entity.PartOfSpeech) ([]string, error)
 }
 
 type LanguageUC interface {
 	GetDefinition(context.Context, string, entity.PartOfSpeech) ([]DefinitionEntry, error)
+	GetTranslation(context.Context, string, entity.PartOfSpeech) ([]string, error)
 }
 
 type DefinitionEntry struct {

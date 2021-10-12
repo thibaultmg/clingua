@@ -7,10 +7,25 @@ Definition: {{ .Definition }}
 ---------------------------
 `
 
+var translationTemplate = `
+----- Vocabulary Card -----
+Title: {{ .Title }}
+Translations: {{join .Translations ", "}}
+---------------------------
+`
+
 var titleTemplate = `
 ----- Vocabulary Card -----
 Title: {{ .Title }}
+---------------------------
+`
+
+var cardTemplate = `
+----- Vocabulary Card -----
+Title: {{ .Title }}
+Part Of Speech: {{ .PartOfSpeech }}
 Definition: {{ .Definition }}
+Translations: {{join .Translations ", "}}
 ---------------------------
 `
 
