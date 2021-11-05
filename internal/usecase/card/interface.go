@@ -7,9 +7,12 @@ import (
 )
 
 type CardRepo interface {
-	Create(context.Context, entity.Card) error
+	Get(context.Context, string) (entity.Card, error)
+	Create(context.Context, entity.Card) (string, error)
+	Delete(context.Context, string) error
+	List(context.Context) ([]entity.Card, error)
 }
 
 type CardUC interface {
-	Create(context.Context, string, entity.PartOfSpeech) (entity.Card, error)
+	Create(ctx context.Context, card entity.Card) (string, error)
 }

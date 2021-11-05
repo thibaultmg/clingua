@@ -3,6 +3,7 @@ package config
 import (
 	"log"
 	"os"
+	"path"
 
 	"github.com/spf13/viper"
 	"golang.org/x/text/language"
@@ -45,6 +46,24 @@ func GetDeeplRepo() (url, authKey string) {
 	authKey = viper.GetString("deepl.authKey")
 
 	return
+}
+
+func GetFSRepoPath() string {
+	fsRepoPath := viper.GetString("fsRepoPath")
+	if !path.IsAbs(fsRepoPath) {
+		panic("fsRepoPath must be absolute")
+	}
+
+	fileInfo, err := os.Stat(fsRepoPath)
+	if err != nil {
+		panic(err)
+	}
+
+	if !fileInfo.IsDir() {
+		panic("fsRepoPath must be a directory")
+	}
+
+	return fsRepoPath
 }
 
 func GetLanguages() (from, to language.Tag) {

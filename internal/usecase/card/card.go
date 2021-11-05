@@ -2,7 +2,9 @@ package card
 
 import (
 	"context"
+	"fmt"
 
+	"github.com/rs/zerolog/log"
 	"github.com/thibaultmg/clingua/internal/entity"
 )
 
@@ -10,22 +12,21 @@ type CardUCImpl struct {
 	cardRepo CardRepo
 }
 
-func NewUseCase(cardRepo CardRepo) CardUC {
+func New(cardRepo CardRepo) CardUC {
 	return CardUCImpl{
 		cardRepo: cardRepo,
 	}
 }
 
-func (u CardUCImpl) Create(ctx context.Context, title string, pos entity.PartOfSpeech) (entity.Card, error) {
-	ret := entity.NewCard()
+func (u CardUCImpl) Create(ctx context.Context, card entity.Card) (string, error) {
+	log.Debug().Msgf("creating card with title %s", card.Title)
 
-	// // Get definition
-	// definition, err := u.defRepo.GetDefinition(ctx, title, pos)
-	// if err != nil {
-	// 	log.Panicln(err)
-	// }
+	// TODO: check card validity
 
-	// ret.Definition = definition[0].Definition
+	cardID, err := u.cardRepo.Create(ctx, card)
+	if err != nil {
+		return "", fmt.Errorf("unable to create card in repository: %w", err)
+	}
 
-	return ret, nil
+	return cardID, nil
 }
