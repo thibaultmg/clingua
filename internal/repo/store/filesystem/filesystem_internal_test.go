@@ -9,16 +9,19 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/thibaultmg/clingua/internal/common"
 	"gopkg.in/yaml.v2"
+
+	"github.com/thibaultmg/clingua/internal/common"
 )
 
 var testCard = card{
 	FromLanguage: "fr",
+	ToLanguage:   "en",
 }
 
 func TestFSRepo_Get(t *testing.T) {
 	assert := assert.New(t)
+	t.Parallel()
 
 	d, err := yaml.Marshal(&testCard)
 	assert.Nil(err)
@@ -30,12 +33,12 @@ func TestFSRepo_Get(t *testing.T) {
 
 	// Write valid card in dir
 	fileID := "myValidCard"
-	err = os.WriteFile(path.Join(tempDir, fileID+".yaml"), d, 0664)
+	err = os.WriteFile(path.Join(tempDir, fileID+".yaml"), d, 0o640)
 	assert.Nil(err)
 
 	// Write invalid card in dir
 	invalidFileID := "invalidCard"
-	err = os.WriteFile(path.Join(tempDir, invalidFileID+".yaml"), []byte("blablabla"), 0664)
+	err = os.WriteFile(path.Join(tempDir, invalidFileID+".yaml"), []byte("blablabla"), 0o640)
 	assert.Nil(err)
 
 	fsrepo := New(tempDir)
@@ -58,6 +61,7 @@ func TestFSRepo_Get(t *testing.T) {
 
 func TestFSRepo_Delete(t *testing.T) {
 	assert := assert.New(t)
+	t.Parallel()
 
 	tempDir, err := os.MkdirTemp("", "fsrepo_test_dir")
 	assert.Nil(err)
@@ -65,7 +69,7 @@ func TestFSRepo_Delete(t *testing.T) {
 	defer os.RemoveAll(tempDir)
 
 	fileID := "myFile"
-	err = os.WriteFile(path.Join(tempDir, fileID+".yaml"), []byte("blablablagarbage"), 0664)
+	err = os.WriteFile(path.Join(tempDir, fileID+".yaml"), []byte("blablablagarbage"), 0o640)
 	assert.Nil(err)
 
 	fsrepo := New(tempDir)
@@ -85,6 +89,7 @@ func TestFSRepo_Delete(t *testing.T) {
 
 func TestFSRepo_Create(t *testing.T) {
 	assert := assert.New(t)
+	t.Parallel()
 
 	tempDir, err := os.MkdirTemp("", "fsrepo_test_dir")
 	assert.Nil(err)
@@ -114,6 +119,7 @@ func TestFSRepo_Create(t *testing.T) {
 
 func TestFSRepo_List(t *testing.T) {
 	assert := assert.New(t)
+	t.Parallel()
 
 	tempDir, err := os.MkdirTemp("", "fsrepo_test_dir")
 	assert.Nil(err)
@@ -129,8 +135,10 @@ func TestFSRepo_List(t *testing.T) {
 
 	// Test with invalid card
 	invalidFilePath := path.Join(tempDir, "invalid.yaml")
-	os.WriteFile(invalidFilePath, []byte("blabla"), 0664)
-	cardsList, err = fsrepo.List(context.Background())
+	err = os.WriteFile(invalidFilePath, []byte("blabla"), 0o640)
+	assert.Nil(err)
+
+	_, err = fsrepo.List(context.Background())
 	assert.NotNil(err)
 
 	err = os.Remove(invalidFilePath)
@@ -141,19 +149,24 @@ func TestFSRepo_List(t *testing.T) {
 	cardAce.Title = "ace"
 	d, err := yaml.Marshal(cardAce)
 	assert.Nil(err)
-	os.WriteFile(path.Join(tempDir, "ace.yaml"), d, 0664)
+	err = os.WriteFile(path.Join(tempDir, "ace.yaml"), d, 0o640)
+	assert.Nil(err)
 
 	cardCar := testCard
 	cardCar.Title = "car"
 	d, err = yaml.Marshal(cardCar)
 	assert.Nil(err)
-	os.WriteFile(path.Join(tempDir, "car.yaml"), d, 0664)
+
+	err = os.WriteFile(path.Join(tempDir, "car.yaml"), d, 0o640)
+	assert.Nil(err)
 
 	cardBoat := testCard
 	cardBoat.Title = "boat"
 	d, err = yaml.Marshal(cardBoat)
 	assert.Nil(err)
-	os.WriteFile(path.Join(tempDir, "boat.yaml"), d, 0664)
+
+	err = os.WriteFile(path.Join(tempDir, "boat.yaml"), d, 0o640)
+	assert.Nil(err)
 
 	// Test that files are listed
 	cardsList, err = fsrepo.List(context.Background())

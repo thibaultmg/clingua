@@ -9,8 +9,9 @@ import (
 	"net/http"
 	"net/url"
 
-	"github.com/thibaultmg/clingua/internal/entity"
 	"golang.org/x/text/language"
+
+	"github.com/thibaultmg/clingua/internal/entity"
 )
 
 // curl https://api-free.deepl.com/v2/translate \
@@ -37,13 +38,13 @@ type Translation struct {
 type Repo struct {
 	client   *http.Client
 	authKey  string
-	baseUrl  *url.URL
+	baseURL  *url.URL
 	fromLang language.Tag
 	toLang   language.Tag
 }
 
-func New(client *http.Client, authKey string, baseUrl string, from, to language.Tag) (Repo, error) {
-	u, err := url.Parse(baseUrl)
+func New(client *http.Client, authKey string, baseURL string, from, to language.Tag) (Repo, error) {
+	u, err := url.Parse(baseURL)
 	if err != nil {
 		return Repo{}, err
 	}
@@ -51,56 +52,56 @@ func New(client *http.Client, authKey string, baseUrl string, from, to language.
 	return Repo{
 		client:   client,
 		authKey:  authKey,
-		baseUrl:  u,
+		baseURL:  u,
 		fromLang: from,
 		toLang:   to,
 	}, nil
 }
 
 func (r Repo) GetTranslation(ctx context.Context, text string, pos entity.PartOfSpeech) ([]string, error) {
-	var ret []string
+	reqURL := fmt.Sprintf("/v2/translate?auth_key=%s&text=%s&source_lang=%s&target_lang=%s&split_sentences=0",
+		r.authKey, text, r.fromLang, r.toLang)
 
-	reqUrl := fmt.Sprintf("/v2/translate?auth_key=%s&text=%s&source_lang=%s&target_lang=%s&split_sentences=0", r.authKey, text, r.fromLang, r.toLang)
-	uriRef, err := url.Parse(reqUrl)
+	uriRef, err := url.Parse(reqURL)
 	if err != nil {
-		return ret, err
+		return []string{}, err
 	}
 
-	req, err := http.NewRequest(http.MethodGet, r.baseUrl.ResolveReference(uriRef).String(), nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, r.baseURL.ResolveReference(uriRef).String(), nil)
 	if err != nil {
-		return ret, err
+		return []string{}, err
 	}
-
-	fmt.Println(req.URL.String())
 
 	req.Header.Add("Accept", "application/json")
 
 	resp, err := r.client.Do(req)
 	if err != nil {
-		return ret, err
+		return []string{}, err
 	}
 
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
 		buf := new(bytes.Buffer)
-		buf.ReadFrom(resp.Body)
-		return ret, fmt.Errorf("http request %v failed with status %v and message: %s", req.URL, resp.StatusCode, buf.String())
+
+		if _, err := buf.ReadFrom(resp.Body); err != nil {
+			return []string{}, err
+		}
+
+		return []string{}, fmt.Errorf("http request %v failed with status %v and message: %s", req.URL, resp.StatusCode, buf.String())
 	}
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return ret, err
+		return []string{}, err
 	}
-
-	fmt.Println(string(body))
 
 	var entries Response
 	if err := json.Unmarshal(body, &entries); err != nil {
-		return ret, err
+		return []string{}, err
 	}
 
-	ret = make([]string, 0, len(entries.Translations))
+	ret := make([]string, 0, len(entries.Translations))
 	for _, tradText := range entries.Translations {
 		ret = append(ret, tradText.Text)
 	}

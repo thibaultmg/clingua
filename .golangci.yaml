@@ -1,9 +1,7 @@
 run:
   concurrency: 3
-  deadline: 3m
+  deadline: 30s
   tests: true
-  # modules-download-mode: vendor
-  #skip-dirs # vendor & generated files are skipped by default
 
 output:
   format: tab
@@ -12,98 +10,25 @@ output:
   sort-results: false
 
 linters:
-  enable:
-    - asciicheck
-    - bodyclose
-    - cyclop
-    - deadcode
-    - depguard
-    - dogsled
-    - dupl
-    - durationcheck
-    - errcheck
-    - exhaustive
-    - exportloopref
-    - forbidigo
-    - forcetypeassert
-    - funlen
-    - gocognit
-    - goconst
-    - gocritic
-    - godot
-    - goerr113
-    - gofmt
-    - gofumpt
-    - goheader
-    - goimports
-    - gomoddirectives
-    - gomodguard
-    - goprintffuncname
-    - gosec
-    - gosimple
-    - govet
-    - importas
-    - ineffassign
-    - lll
-    - makezero
-    - misspell
-    - nakedret
-    - nestif
-    - nilerr
-    - noctx
-    - nolintlint
-    - prealloc
-    - predeclared
-    - promlinter
-    - revive
-    - rowserrcheck
-    - sqlclosecheck
-    - staticcheck
-    - structcheck
-    - stylecheck
-    - tagliatelle
-    - testpackage
-    - thelper
-    - tparallel
-    - typecheck
-    - unconvert
-    - unparam
-    - unused
-    - varcheck
-    - wastedassign
-    - whitespace
+  enable-all: true
+  disable:
     - wrapcheck
-    - wsl
-  fast: false
+    - tagliatelle
+    - exhaustivestruct
+    - gci
+    - golint
+    - interfacer
+    - scopelint
+    - maligned
+    - gochecknoglobals
+    - revive
+    - goerr113
+    - gochecknoinits
+    - exhaustive
 
 linters-settings:
-  cyclop:
-    max-complexity: 18
-  errcheck:
-    check-type-assertions: true
-  exhaustive:
-    default-signifies-exhaustive: true
-  gocognit:
-    min-complexity: 18
-  gofumpt:
-    lang-version: '1.17'
-  goimports:
-    local-prefixes: code.tooling.prod.cdsf.io/ctp
-  govet:
-    check-shadowing: true
-    enable-all: true
-    # disable:
-    #   - fieldalignment
-  misspell:
-    locale: US
   lll:
-    line-length: 160
-  staticcheck:
-    # Select the Go version to target. The default is '1.13'.
-    go: '1.17'
-  stylecheck:
-    # Select the Go version to target. The default is '1.13'.
-    go: '1.17'
-  unused:
-    # Select the Go version to target. The default is '1.13'.
-    go: '1.17'
+    line-length: 140
+  gosec:
+    excludes:
+      - G306

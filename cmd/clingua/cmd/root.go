@@ -8,6 +8,7 @@ import (
 
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
+
 	"github.com/thibaultmg/clingua/internal/config"
 )
 
@@ -37,16 +38,20 @@ func Execute() error {
 func init() {
 	// Automatically adds --version command
 	rootCmd.Version = ClinguaVersion
+
 	cobra.OnInitialize(func() {
 		config.InitConfig(cfgFile)
 	})
 
 	rootCmd.PersistentFlags().StringVarP(&cfgFile, "config", "c", "", "config file (default is $PWD/.clingua.yaml)")
 	rootCmd.PersistentFlags().StringVar(&logLevel, "log-level", "warn", "log level")
-	viper.BindPFlag("logLevel", rootCmd.PersistentFlags().Lookup("log-level"))
+
+	err := viper.BindPFlag("logLevel", rootCmd.PersistentFlags().Lookup("log-level"))
+	if err != nil {
+		panic(err)
+	}
 
 	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
-
 }
 
 func setLogLevel() {

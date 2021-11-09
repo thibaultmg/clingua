@@ -4,53 +4,46 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strings"
+	"text/tabwriter"
+	"text/template"
 
 	"github.com/looplab/fsm"
 	"github.com/rs/zerolog/log"
 )
 
-type event string
-
-func (e event) String() string {
-	return string(e)
-}
-
 type state string
 
-func (s state) String() string {
-	return string(s)
-}
-
 const (
-	startCreationState     state = "startCreation"
-	editFieldMenuState     state = "editFieldMenu"
-	cardMenuState          state = "cardMenu"
-	saveState              state = "save"
+	initState              state = "init"
+	editFieldState         state = "editField"
+	editCardState          state = "editCard"
+	saveCardState          state = "saveCard"
 	endState               state = "end"
-	fieldPropositionsState state = "fieldPropositions"
-	editFieldPromptState   state = "editFieldPrompt"
+	selectPropositionState state = "selectProposition"
+	writeFieldState        state = "writeField"
+	listCardsState         state = "listCards"
 )
 
+type event string
+
 const (
-	startEvent                 event = "start"
-	cancelEditFieldEvent       event = "cancelEditField"
-	quitEvent                  event = "quit"
-	editFieldEvent             event = "editField"
-	showFieldPropositionsEvent event = "showFieldPropositions"
-	setFieldEvent              event = "setField"
-	validateFieldEvent         event = "validateField"
-	saveCardEvent              event = "saveCard"
-	showCardEvent              event = "showCard"
-	nextFieldEvent             event = "nextField"
+	editFieldEvent         event = "editField"
+	editCardEvent          event = "editCard"
+	selectPropositionEvent event = "selectProposition"
+	writeFieldEvent        event = "writeField"
+	listCardsEvent         event = "listCards"
+	quitEvent              event = "quit"
+	saveCardEvent          event = "saveCard"
 )
 
 type CardCLI struct {
-	ce               *CardEditor
-	FSM              *fsm.FSM
-	console          console
-	activeField      CardField
-	activeFieldIndex int
-	done             <-chan struct{}
+	ce          *CardEditor
+	FSM         *fsm.FSM
+	console     console
+	activeField CardField
+	initTrack   bool
+	done        <-chan struct{}
 }
 
 func NewCardCLI(ce *CardEditor) *CardCLI {
@@ -62,29 +55,31 @@ func NewCardCLI(ce *CardEditor) *CardCLI {
 	}
 
 	ret.FSM = fsm.NewFSM(
-		"",
+		string(initState),
 		fsm.Events{
-			{Name: startEvent.String(), Src: []string{startCreationState.String()}, Dst: editFieldMenuState.String()},
-			{Name: cancelEditFieldEvent.String(), Src: []string{editFieldMenuState.String()}, Dst: cardMenuState.String()},
-			{Name: quitEvent.String(), Src: []string{cardMenuState.String(), saveState.String()}, Dst: endState.String()},
-			{Name: editFieldEvent.String(), Src: []string{editFieldMenuState.String()}, Dst: editFieldPromptState.String()},
-			{Name: showFieldPropositionsEvent.String(), Src: []string{editFieldMenuState.String()}, Dst: fieldPropositionsState.String()},
-			{Name: setFieldEvent.String(), Src: []string{editFieldPromptState.String(), fieldPropositionsState.String(), cardMenuState.String()}, Dst: editFieldMenuState.String()},
-			{Name: validateFieldEvent.String(), Src: []string{editFieldMenuState.String()}, Dst: cardMenuState.String()},
-			{Name: saveCardEvent.String(), Src: []string{cardMenuState.String()}, Dst: saveState.String()},
-			{Name: showCardEvent.String(), Src: []string{cardMenuState.String()}, Dst: cardMenuState.String()},
-			{Name: nextFieldEvent.String(), Src: []string{editFieldMenuState.String()}, Dst: editFieldMenuState.String()},
+			{
+				Name: string(editFieldEvent),
+				Src:  []string{string(writeFieldState), string(selectPropositionState), string(editCardState), string(initState)},
+				Dst:  string(editFieldState),
+			},
+			{Name: string(editCardEvent), Src: []string{string(listCardsState), string(editFieldState)}, Dst: string(editCardState)},
+			{Name: string(selectPropositionEvent), Src: []string{string(editFieldState)}, Dst: string(selectPropositionState)},
+			{Name: string(writeFieldEvent), Src: []string{string(editFieldState)}, Dst: string(writeFieldState)},
+			{Name: string(quitEvent), Src: []string{string(editCardState), string(saveCardState)}, Dst: string(endState)},
+			{Name: string(listCardsEvent), Src: []string{string(editCardState), string(initState)}, Dst: string(listCardsState)},
+			{Name: string(saveCardEvent), Src: []string{string(editCardState)}, Dst: string(saveCardState)},
 		},
 		fsm.Callbacks{
 			"enter_state": func(e *fsm.Event) {
 				log.Debug().Msgf("Enter state with event %s from state %s to state %s", e.Event, e.Src, e.Dst)
 			},
-			"enter_" + editFieldMenuState.String():     ret.editFieldMenu,
-			"enter_" + fieldPropositionsState.String(): ret.showFieldPropositions,
-			"enter_" + editFieldPromptState.String():   ret.editFieldPrompt,
-			"enter_" + cardMenuState.String():          ret.cardMenu,
-			"enter_" + saveState.String():              ret.save,
-			"enter_" + endState.String(): func(e *fsm.Event) {
+			"enter_" + string(editFieldState):         ret.editFieldMenu,
+			"enter_" + string(selectPropositionState): ret.showFieldPropositions,
+			"enter_" + string(writeFieldState):        ret.editFieldPrompt,
+			"enter_" + string(editCardState):          ret.cardMenu,
+			"enter_" + string(saveCardState):          ret.save,
+			"enter_" + string(listCardsState):         ret.listCards,
+			"enter_" + string(endState): func(e *fsm.Event) {
 				close(doneChan)
 			},
 		},
@@ -95,45 +90,121 @@ func NewCardCLI(ce *CardEditor) *CardCLI {
 	return ret
 }
 
-func (c *CardCLI) Run() {
-	c.FSM.SetState(startCreationState.String())
+func (c *CardCLI) RunCreate() {
+	c.initTrack = true
 	c.activeField = DefinitionField
-	go c.sendEvent(startEvent.String())
+	c.sendEvent(string(editFieldState))
+	<-c.done
+}
+
+func (c *CardCLI) RunList() {
+	c.sendEvent(string(listCardsEvent))
 	<-c.done
 }
 
 func (c *CardCLI) Stop() {
-	c.FSM.SetState(endState.String())
+	c.FSM.SetState(string(endState))
 }
 
 func (c *CardCLI) cardMenu(e *fsm.Event) {
+	if c.initTrack {
+		if nextField, hasNext := c.activeField.Next(); hasNext {
+			c.activeField = nextField
+			c.sendEvent(string(editFieldEvent))
+
+			return
+		} else {
+			c.initTrack = false
+		}
+	}
+
 	c.ce.Print(NoField)
-	items := []string{"edit title", "edit definition", "edit translations", "edit exemples", "validate", "cancel"}
+
+	var (
+		editTitleField       = "edit title"
+		editDefinitionField  = "edit definition"
+		editTranslationField = "edit translations"
+		editExamplesField    = "edit examples"
+		saveField            = "save"
+		listField            = "list"
+		quitField            = "quit"
+	)
+
+	items := []string{editTitleField, editDefinitionField, editTranslationField, editExamplesField, saveField, listField, quitField}
+
 	resultIdx, err := c.console.Select("Card", items)
 	if err != nil {
 		log.Error().Err(err).Msg("Prompt failed to get selection")
 	}
 
-	switch resultIdx {
-	case 0:
+	switch items[resultIdx] {
+	case editTitleField:
 		c.activeField = TitleField
-		go c.sendEvent(setFieldEvent.String())
-	case 1:
+		c.sendEvent(string(editFieldEvent))
+	case editDefinitionField:
 		c.activeField = DefinitionField
-		go c.sendEvent(setFieldEvent.String())
-	case 2:
+		c.sendEvent(string(editFieldEvent))
+	case editTranslationField:
 		c.activeField = TranslationField
-		go c.sendEvent(setFieldEvent.String())
-	case 3:
-		c.activeField = ExempleField
-		go c.sendEvent(setFieldEvent.String())
-	case 4:
-		go c.sendEvent(saveCardEvent.String())
-	case 5:
-		go c.sendEvent(quitEvent.String())
+		c.sendEvent(string(editFieldEvent))
+	case editExamplesField:
+		c.activeField = ExampleField
+		c.sendEvent(string(editFieldEvent))
+	case saveField:
+		c.sendEvent(string(saveCardEvent))
+	case listField:
+		c.sendEvent(string(listCardsEvent))
+	case quitField:
+		c.sendEvent(string(quitEvent))
 	default:
 		log.Error().Msgf("Invalid prompt index %d", resultIdx)
 	}
+}
+
+func printMaxChars(s string, maxCount int) string {
+	if len(s) <= maxCount {
+		return s
+	}
+
+	return strings.TrimSpace(s[:maxCount]) + "..."
+}
+
+func (c *CardCLI) listCards(e *fsm.Event) {
+	cardsList := c.ce.ListCards()
+	// items := make([]string, 0, len(cardsList))
+	var tabs strings.Builder
+	w := tabwriter.NewWriter(&tabs, 0, 0, 2, ' ', 0) //nolint:gomnd
+	tFuncs := template.FuncMap{
+		"printMax": printMaxChars,
+		"join":     strings.Join,
+	}
+
+	for i, e := range cardsList {
+		if i != 0 {
+			fmt.Fprintf(w, "\n")
+		}
+
+		t := template.Must(template.New("cardsListItem").Funcs(tFuncs).Parse(cardListItem))
+
+		err := t.Execute(w, e)
+		if err != nil {
+			log.Error().Err(err).Msg("failed to execute template on cards list item")
+		}
+	}
+
+	if err := w.Flush(); err != nil {
+		log.Warn().Err(err).Msg("Failed to flush tabwriter")
+	}
+
+	items := strings.Split(tabs.String(), "\n")
+
+	selectedIndex, err := c.console.Select("Select card:", items)
+	if err != nil {
+		log.Warn().Err(err).Msg("unable to get selected card")
+	}
+
+	c.ce.SetCard(&cardsList[selectedIndex])
+	c.sendEvent(string(editCardEvent))
 }
 
 func (c *CardCLI) showFieldPropositions(e *fsm.Event) {
@@ -141,22 +212,31 @@ func (c *CardCLI) showFieldPropositions(e *fsm.Event) {
 	doneBusy := c.console.Busy(done)
 
 	props, err := c.ce.GetPropositions(c.activeField, 0)
+
 	close(done)
+
 	<-doneBusy
+
 	if err != nil {
 		log.Warn().Err(err).Msg("unable to get propositions")
 	}
 
 	label := "Select " + c.activeField.String() + ":"
+
 	index, err := c.console.Select(label, props)
 	if err != nil {
 		log.Warn().Err(err).Msg("unable to select proposition")
-		go c.sendEvent(setFieldEvent.String())
+		c.sendEvent(string(editFieldEvent))
+
 		return
 	}
 
-	c.ce.SetProposition(c.activeField, index)
-	go c.sendEvent(setFieldEvent.String())
+	err = c.ce.SetProposition(c.activeField, index)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to set proposition")
+	}
+
+	c.sendEvent(string(editFieldEvent))
 }
 
 func (c *CardCLI) editFieldPrompt(e *fsm.Event) {
@@ -165,18 +245,20 @@ func (c *CardCLI) editFieldPrompt(e *fsm.Event) {
 	result, err := c.console.Prompt(c.activeField.String(), c.ce.GetField(c.activeField, 0))
 	if err != nil {
 		log.Warn().Err(err).Msg("error reading prompt")
-		go c.sendEvent(setFieldEvent.String())
+		c.sendEvent(string(editFieldEvent))
+
 		return
 	}
 
-	c.ce.SetField(c.activeField, 0, result)
+	err = c.ce.SetField(c.activeField, 0, result)
 	if err != nil {
 		log.Warn().Err(err).Msg("error setting field")
-		go c.sendEvent(setFieldEvent.String())
+		c.sendEvent(string(editFieldEvent))
+
 		return
 	}
 
-	go c.sendEvent(setFieldEvent.String())
+	c.sendEvent(string(editFieldEvent))
 }
 
 func (c *CardCLI) editFieldMenu(e *fsm.Event) {
@@ -187,40 +269,57 @@ func (c *CardCLI) editFieldMenu(e *fsm.Event) {
 	c.ce.Print(c.activeField)
 
 	label := fmt.Sprintf("Edit field %s", c.activeField.String())
-	items := []string{"Show propositions", "Edit", "Validate", "Cancel"}
+
+	var (
+		showPropsField = "Show propositions"
+		editField      = "Edit"
+		validateField  = "Validate"
+		cancelField    = "Cancel"
+	)
+
+	items := []string{showPropsField, editField, validateField, cancelField}
+
 	resultIdx, err := c.console.Select(label, items)
 	if err != nil {
 		log.Error().Err(err).Msg("Prompt failed to get selection for editFieldMenu")
+
 		if errors.Is(err, errInterrupt) || errors.Is(err, errEOF) {
 			os.Exit(1)
 		}
 	}
 
-	switch resultIdx {
-	case 0:
-		go c.sendEvent(showFieldPropositionsEvent.String())
-	case 1:
-		go c.sendEvent(editFieldEvent.String())
-	case 2:
-		go c.sendEvent(validateFieldEvent.String())
-	case 3:
-		go c.sendEvent(cancelEditFieldEvent.String())
+	switch items[resultIdx] {
+	case showPropsField:
+		c.sendEvent(string(selectPropositionEvent))
+	case editField:
+		c.sendEvent(string(writeFieldEvent))
+	case validateField:
+		c.sendEvent(string(editCardEvent))
+	case cancelField:
+		c.initTrack = false
+		c.sendEvent(string(editCardEvent))
 	default:
 		log.Error().Msgf("Invalid prompt index %d", resultIdx)
 	}
 }
 
 func (c *CardCLI) sendEvent(eventName string) {
-	log.Debug().Msgf("can use event %s from state %s: %t. Available transitions: %#s", eventName, c.FSM.Current(), c.FSM.Can(eventName), c.FSM.AvailableTransitions())
+	log.Trace().Msgf("can use event %s from state %s: %t. Available transitions: %s",
+		eventName, c.FSM.Current(), c.FSM.Can(eventName), c.FSM.AvailableTransitions())
 
-	err := c.FSM.Event(eventName)
-	if err != nil {
-		log.Error().Err(err)
-	}
+	go func() {
+		err := c.FSM.Event(eventName)
+		if err != nil {
+			log.Error().Err(err)
+		}
+	}()
 }
 
 func (c *CardCLI) save(e *fsm.Event) {
-	fmt.Println("Saving card")
-	go c.sendEvent(quitEvent.String())
+	if err := c.ce.SaveCard(); err != nil {
+		log.Error().Err(err).Msg("failed to save card")
+	}
+
+	c.sendEvent(string(quitEvent))
 	os.Exit(0)
 }

@@ -1,12 +1,17 @@
 package entity
 
 import (
-	"fmt"
+	"encoding/base64"
 	"math/rand"
+	"time"
 )
 
 func makePseudoUUID() string {
-	b := make([]byte, 16)
-	rand.Read(b)
-	return fmt.Sprintf("%x-%x-%x-%x-%x", b[0:4], b[4:6], b[6:8], b[8:10], b[10:])
+	// Generate 9 random bytes to obtain 12 base64 characters
+	b := make([]byte, 9) //nolint:gomnd
+
+	rand.Seed(time.Now().UnixNano())
+	rand.Read(b) //nolint:gosec
+
+	return base64.StdEncoding.EncodeToString(b)
 }

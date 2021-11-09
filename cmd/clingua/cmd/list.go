@@ -1,12 +1,9 @@
 package cmd
 
 import (
-	"strings"
-
 	"github.com/spf13/cobra"
 
 	"github.com/thibaultmg/clingua/internal/config"
-	"github.com/thibaultmg/clingua/internal/entity"
 	"github.com/thibaultmg/clingua/internal/presenter/cli/card"
 	"github.com/thibaultmg/clingua/internal/repo/language"
 	"github.com/thibaultmg/clingua/internal/repo/store/filesystem"
@@ -15,14 +12,14 @@ import (
 )
 
 func init() {
-	rootCmd.AddCommand(createCmd)
+	rootCmd.AddCommand(listCmd)
 }
 
-var createCmd = &cobra.Command{
-	Use:   "create",
-	Short: "Create a new vocabulary card",
-	Long:  `Interactive command to create a vocabulary card, selecting definition and examples`,
-	Args:  cobra.MinimumNArgs(1),
+var listCmd = &cobra.Command{
+	Use:   "list",
+	Short: "List and search vocabulary cards",
+	Long:  `Interactive command to list vocabulary cards and editing them`,
+	// Args:  cobra.MinimumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		fromLang, toLang := config.GetLanguages()
 		dict := language.NewDictionnary(toLang)
@@ -32,12 +29,9 @@ var createCmd = &cobra.Command{
 		cardRepo := filesystem.New(config.GetFSRepoPath())
 		cuc := carduc.New(cardRepo)
 
-		c := entity.NewCard()
-		c.Title = strings.Join(args, " ")
-		cardEditor := card.NewCardEditor(&c, luc, cuc)
-
+		cardEditor := card.NewCardEditor(nil, luc, cuc)
 		cardPresenter := card.NewCardCLI(cardEditor)
 
-		cardPresenter.RunCreate()
+		cardPresenter.RunList()
 	},
 }

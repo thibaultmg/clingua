@@ -10,27 +10,30 @@ import (
 	"net/url"
 	"strings"
 
+	"golang.org/x/text/language"
+
+	"github.com/rs/zerolog/log"
+
 	"github.com/thibaultmg/clingua/internal/entity"
 	languageuc "github.com/thibaultmg/clingua/internal/usecase/language"
-	"golang.org/x/text/language"
 )
 
 type Repo struct {
-	baseUrl *url.URL
+	baseURL *url.URL
 	appID   string
 	appKey  string
 	client  *http.Client
 	toLang  language.Tag
 }
 
-func New(client *http.Client, baseUrl, appID, appKey string, to language.Tag) (Repo, error) {
-	u, err := url.Parse(baseUrl)
+func New(client *http.Client, baseURL, appID, appKey string, to language.Tag) (Repo, error) {
+	u, err := url.Parse(baseURL)
 	if err != nil {
 		return Repo{}, err
 	}
 
 	return Repo{
-		baseUrl: u,
+		baseURL: u,
 		appID:   appID,
 		appKey:  appKey,
 		client:  client,
@@ -38,29 +41,30 @@ func New(client *http.Client, baseUrl, appID, appKey string, to language.Tag) (R
 	}, nil
 }
 
+//nolint:funlen
 func (r Repo) GetDefinition(ctx context.Context, word string, pos entity.PartOfSpeech) ([]languageuc.DefinitionEntry, error) {
 	var ret []languageuc.DefinitionEntry
 
-	var reqUrl strings.Builder
+	var reqURL strings.Builder
 
 	baseQueryString := "fields=definitions,domains,examples,pronunciations,registers&strictMatch=false"
 
-	if _, err := fmt.Fprintf(&reqUrl, "/api/v2/entries/%s/%s?%s", r.toLang, word, baseQueryString); err != nil {
+	if _, err := fmt.Fprintf(&reqURL, "/api/v2/entries/%s/%s?%s", r.toLang, word, baseQueryString); err != nil {
 		panic(err)
 	}
 
 	if !pos.IsAny() {
-		if _, err := fmt.Fprintf(&reqUrl, "&lexicalCategory=%s", pos); err != nil {
+		if _, err := fmt.Fprintf(&reqURL, "&lexicalCategory=%s", pos); err != nil {
 			panic(err)
 		}
 	}
 
-	uriRef, err := url.Parse(reqUrl.String())
+	uriRef, err := url.Parse(reqURL.String())
 	if err != nil {
 		return ret, err
 	}
 
-	req, err := http.NewRequest(http.MethodGet, r.baseUrl.ResolveReference(uriRef).String(), nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, r.baseURL.ResolveReference(uriRef).String(), nil)
 	if err != nil {
 		return ret, err
 	}
@@ -78,7 +82,12 @@ func (r Repo) GetDefinition(ctx context.Context, word string, pos entity.PartOfS
 
 	if resp.StatusCode != http.StatusOK {
 		buf := new(bytes.Buffer)
-		buf.ReadFrom(resp.Body)
+
+		_, err := buf.ReadFrom(resp.Body)
+		if err != nil {
+			log.Error().Err(err).Msg("failed to read get definition response body")
+		}
+
 		return ret, fmt.Errorf("http request %v failed with status %v and message: %s", req.URL, resp.StatusCode, buf.String())
 	}
 

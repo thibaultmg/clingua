@@ -8,5 +8,14 @@ build:
 run.create: build
 	./dist/clingua -c $(PWD)/resources/.clingua.yaml create car
 
+run.list: build
+	./dist/clingua -c $(PWD)/resources/.clingua.yaml list
+
 run.version: build
 	./dist/clingua -c $(PWD)/resources/.clingua.yaml --version
+
+check:
+	go mod tidy
+	gofumpt -l -w ./
+	goimports -local=github.com/thibaultmg/clingua -w ./
+	golangci-lint run

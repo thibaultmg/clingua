@@ -8,9 +8,10 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"golang.org/x/text/language"
+
 	"github.com/thibaultmg/clingua/internal/entity"
 	"github.com/thibaultmg/clingua/internal/repo/language/deepl"
-	"golang.org/x/text/language"
 )
 
 var testResponse = `
@@ -24,7 +25,7 @@ var testResponse = `
 
 func TestDeepl_Nominal(t *testing.T) {
 	assert := assert.New(t)
-	assert.True(true)
+	t.Parallel()
 
 	word := "ace"
 

@@ -9,7 +9,6 @@ var (
 	ErrNotFound      = errors.New("not found")
 	ErrAlreadyExists = errors.New("already exists")
 	ErrInvalidData   = errors.New("invalid data")
-	//ErrInternalError = errors.New("internal error")
 )
 
 type ErrInternalError struct {

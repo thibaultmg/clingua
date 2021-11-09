@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-var ErrInvalidPartOfSpeech = errors.New("Invalid Part Of Speech")
+var ErrInvalidPartOfSpeech = errors.New("invalid Part Of Speech")
 
 type PartOfSpeech int
 
@@ -69,5 +69,5 @@ func ParsePartOfSpeech(pos string) (PartOfSpeech, error) {
 		return Interjection, nil
 	}
 
-	return 0, fmt.Errorf("Error with value %s: %w", pos, ErrInvalidPartOfSpeech)
+	return 0, fmt.Errorf("error with value %s: %w", pos, ErrInvalidPartOfSpeech)
 }

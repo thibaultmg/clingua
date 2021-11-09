@@ -8,7 +8,7 @@ import (
 	"github.com/thibaultmg/clingua/internal/entity"
 )
 
-type Dictionnary interface {
+type Dictionary interface {
 	GetDefinition(context.Context, string, entity.PartOfSpeech) ([]DefinitionEntry, error)
 }
 
@@ -25,7 +25,7 @@ type DefinitionEntry struct {
 	Definition   string
 	Provider     string
 	PartOfSpeech entity.PartOfSpeech
-	Exemples     []string
+	Examples     []string
 	Domains      []string
 	Registers    []string
 }

@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/rs/zerolog/log"
+
 	"github.com/thibaultmg/clingua/internal/entity"
 )
 
@@ -12,7 +13,7 @@ type CardUCImpl struct {
 	cardRepo CardRepo
 }
 
-func New(cardRepo CardRepo) CardUC {
+func New(cardRepo CardRepo) CardUCImpl {
 	return CardUCImpl{
 		cardRepo: cardRepo,
 	}
@@ -29,4 +30,15 @@ func (u CardUCImpl) Create(ctx context.Context, card entity.Card) (string, error
 	}
 
 	return cardID, nil
+}
+
+func (u CardUCImpl) List(ctx context.Context) ([]entity.Card, error) {
+	cardsList, err := u.cardRepo.List(ctx)
+	if err != nil {
+		return []entity.Card{}, fmt.Errorf("unable to list cards from repository: %w", err)
+	}
+
+	// TODO: check validity
+
+	return cardsList, nil
 }

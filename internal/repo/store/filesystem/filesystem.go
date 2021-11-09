@@ -9,12 +9,16 @@ import (
 	"path"
 	"strings"
 
+	"gopkg.in/yaml.v2"
+
 	"github.com/thibaultmg/clingua/internal/common"
 	"github.com/thibaultmg/clingua/internal/entity"
-	"gopkg.in/yaml.v2"
 )
 
-const yamlExtension = ".yaml"
+const (
+	yamlExtension    = ".yaml"
+	filesPermissions = 0o640
+)
 
 type FSRepo struct {
 	root string
@@ -30,7 +34,7 @@ func New(root string) *FSRepo {
 	}
 }
 
-// Get returns the Card having the ID id, which is its file path
+// Get returns the Card having the ID id, which is its file path.
 func (f *FSRepo) Get(ctx context.Context, id string) (entity.Card, error) {
 	fileData, err := os.ReadFile(path.Join(f.root, id+yamlExtension))
 	// fileData, err := fs.ReadFile(f.fs, id)
@@ -43,6 +47,7 @@ func (f *FSRepo) Get(ctx context.Context, id string) (entity.Card, error) {
 	}
 
 	var cardData card
+
 	err = yaml.Unmarshal(fileData, &cardData)
 	if err != nil {
 		return entity.Card{}, common.NewErrInternalError(err)
@@ -51,7 +56,9 @@ func (f *FSRepo) Get(ctx context.Context, id string) (entity.Card, error) {
 	return cardData.ToEntity(), nil
 }
 
-func (f *FSRepo) Create(ctx context.Context, card entity.Card) (string, error) {
+func (f *FSRepo) Create(ctx context.Context, ecard entity.Card) (string, error) {
+	card := entityToCard(&ecard)
+
 	cardData, err := yaml.Marshal(&card)
 	if err != nil {
 		return "", err
@@ -66,25 +73,32 @@ func (f *FSRepo) Create(ctx context.Context, card entity.Card) (string, error) {
 		fileName = "no_title"
 	}
 
-	var cardFile *os.File
-	var extension string
-	var counter int
+	var (
+		cardFile               *os.File
+		antiCollisionExtension string
+		counter                int
+	)
+
+main:
 	for {
-		cardFile, err = os.OpenFile(path.Join(f.root, fileName+extension+yamlExtension), os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0664)
-		if errors.Is(err, fs.ErrExist) {
+		cardFile, err = os.OpenFile(
+			path.Join(f.root, fileName+antiCollisionExtension+yamlExtension), os.O_WRONLY|os.O_CREATE|os.O_EXCL, filesPermissions)
+
+		switch {
+		case errors.Is(err, fs.ErrExist):
 			counter++
 			if counter > 0 {
-				extension = fmt.Sprintf("(%d)", counter)
+				antiCollisionExtension = fmt.Sprintf("(%d)", counter)
 			}
-		} else if err != nil {
+		case err != nil:
 			return fileName, err
-		} else {
-			fileName = fileName + extension
-			break
+		default:
+			defer cardFile.Close()
+			fileName += antiCollisionExtension
+
+			break main
 		}
 	}
-
-	defer cardFile.Close()
 
 	_, err = cardFile.Write(cardData)
 	if err != nil {
@@ -96,6 +110,7 @@ func (f *FSRepo) Create(ctx context.Context, card entity.Card) (string, error) {
 
 func (f *FSRepo) Delete(ctx context.Context, id string) error {
 	filePath := path.Join(f.root, id+yamlExtension)
+
 	err := os.Remove(filePath)
 	if err != nil {
 		if errors.Is(err, fs.ErrNotExist) {
@@ -115,6 +130,7 @@ func (f *FSRepo) List(ctx context.Context) ([]entity.Card, error) {
 	}
 
 	ret := make([]entity.Card, 0, len(dirEntries))
+
 	for _, e := range dirEntries {
 		if e.IsDir() {
 			continue
@@ -130,6 +146,7 @@ func (f *FSRepo) List(ctx context.Context) ([]entity.Card, error) {
 		}
 
 		var repoCard card
+
 		err = yaml.Unmarshal(fileData, &repoCard)
 		if err != nil {
 			return []entity.Card{}, err

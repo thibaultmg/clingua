@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/rs/zerolog/log"
+
 	"github.com/thibaultmg/clingua/internal/entity"
 )
 
@@ -11,11 +12,11 @@ import (
 // A language instance is dedicated to one fromLanguage (the learner native language) and one toLanguage
 // (the learned language).
 type LanguageUCImpl struct {
-	dict  Dictionnary
+	dict  Dictionary
 	trans Translator
 }
 
-func New(dict Dictionnary, trans Translator) *LanguageUCImpl {
+func New(dict Dictionary, trans Translator) *LanguageUCImpl {
 	return &LanguageUCImpl{
 		dict:  dict,
 		trans: trans,
@@ -28,6 +29,7 @@ func (l *LanguageUCImpl) GetDefinition(ctx context.Context, word string, pos ent
 	resp, err := l.dict.GetDefinition(ctx, word, pos)
 	if err != nil {
 		log.Error().Err(err).Str("word", word).Str("partOfSpeech", pos.String()).Msg("Unable to get definition")
+
 		return resp, err
 	}
 
@@ -40,6 +42,7 @@ func (l *LanguageUCImpl) GetTranslation(ctx context.Context, word string, pos en
 	resp, err := l.trans.GetTranslation(ctx, word, pos)
 	if err != nil {
 		log.Error().Err(err).Str("word", word).Str("partOfSpeech", pos.String()).Msg("Unable to get definition")
+
 		return resp, err
 	}
 

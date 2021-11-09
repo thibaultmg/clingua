@@ -26,7 +26,7 @@ func response2Internal(response EntriesResponse) []language.DefinitionEntry {
 					}
 
 					for _, ex := range s.Examples {
-						newEntry.Exemples = append(newEntry.Exemples, ex.Text)
+						newEntry.Examples = append(newEntry.Examples, ex.Text)
 					}
 
 					for _, reg := range s.Registers {
