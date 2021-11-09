@@ -127,10 +127,14 @@ func (c *CardCLI) cardMenu(e *fsm.Event) {
 		editExamplesField    = "edit examples"
 		saveField            = "save"
 		listField            = "list"
-		quitField            = "quit"
+		removeField          = "delete"
+		newField             = "new"
 	)
 
-	items := []string{editTitleField, editDefinitionField, editTranslationField, editExamplesField, saveField, listField, quitField}
+	items := []string{
+		editTitleField, editDefinitionField, editTranslationField, editExamplesField,
+		saveField, removeField, listField, newField,
+	}
 
 	resultIdx, err := c.console.Select("Card", items)
 	if err != nil {
@@ -154,8 +158,18 @@ func (c *CardCLI) cardMenu(e *fsm.Event) {
 		c.sendEvent(string(saveCardEvent))
 	case listField:
 		c.sendEvent(string(listCardsEvent))
-	case quitField:
-		c.sendEvent(string(quitEvent))
+	case removeField:
+		if err := c.ce.DeleteCard(); err != nil {
+			c.console.Println("failed to delete card")
+		}
+
+		c.sendEvent(string(listCardsEvent))
+	case newField:
+		c.initTrack = true
+		c.activeField = TitleField
+		c.ce.ResetCard()
+		c.FSM.SetState(string(initState))
+		c.sendEvent(string(editFieldState))
 	default:
 		log.Error().Msgf("Invalid prompt index %d", resultIdx)
 	}
@@ -320,6 +334,5 @@ func (c *CardCLI) save(e *fsm.Event) {
 		log.Error().Err(err).Msg("failed to save card")
 	}
 
-	c.sendEvent(string(quitEvent))
-	os.Exit(0)
+	c.sendEvent(string(editCardEvent))
 }

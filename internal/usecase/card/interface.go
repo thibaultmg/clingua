@@ -16,4 +16,5 @@ type CardRepo interface {
 type CardUC interface {
 	Create(ctx context.Context, card entity.Card) (string, error)
 	List(ctx context.Context) ([]entity.Card, error)
+	Delete(context.Context, string) error
 }

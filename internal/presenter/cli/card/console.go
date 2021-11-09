@@ -40,6 +40,13 @@ func (c console) WriteString(data string) (int, error) {
 	return c.writer.WriteString(data)
 }
 
+func (c console) Println(s string) {
+	_, err := c.writer.WriteString(s + "\n")
+	if err != nil {
+		log.Error().Err(err).Msg("failed to write string on console")
+	}
+}
+
 func (c console) Select(label string, items []string) (int, error) {
 	searcher := func(input string, index int) bool {
 		item := items[index]

@@ -86,10 +86,19 @@ func (c *CardEditor) SetCard(card *entity.Card) {
 	c.card = card
 }
 
+func (c *CardEditor) ResetCard() {
+	newCard := entity.NewCard()
+	c.card = &newCard
+}
+
 func (c *CardEditor) SaveCard() error {
 	_, err := c.cardUC.Create(context.Background(), *c.card)
 
 	return err
+}
+
+func (c *CardEditor) DeleteCard() error {
+	return c.cardUC.Delete(context.Background(), c.card.ID)
 }
 
 func (c *CardEditor) ListCards() []entity.Card {

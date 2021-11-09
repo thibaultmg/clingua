@@ -42,3 +42,14 @@ func (u CardUCImpl) List(ctx context.Context) ([]entity.Card, error) {
 
 	return cardsList, nil
 }
+
+func (u CardUCImpl) Delete(ctx context.Context, id string) error {
+	err := u.cardRepo.Delete(ctx, id)
+	if err != nil {
+		log.Error().Err(err).Msgf("failed to delete card with ID %s", id)
+
+		return err
+	}
+
+	return nil
+}

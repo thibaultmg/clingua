@@ -16,6 +16,7 @@ run.version: build
 
 check:
 	go mod tidy
+	go test ./...
 	gofumpt -l -w ./
 	goimports -local=github.com/thibaultmg/clingua -w ./
 	golangci-lint run
