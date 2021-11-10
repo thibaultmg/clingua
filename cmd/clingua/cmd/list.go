@@ -22,9 +22,10 @@ var listCmd = &cobra.Command{
 	// Args:  cobra.MinimumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		fromLang, toLang := config.GetLanguages()
-		dict := language.NewDictionnary(toLang)
+		dict := language.NewEnglishDictionnary(toLang)
 		trans := language.NewTranslator(toLang, fromLang)
-		luc := languageuc.New(dict, trans)
+		wtrans := language.NewWordTranslator(toLang, fromLang)
+		luc := languageuc.New(dict, trans, wtrans)
 
 		cardRepo := filesystem.New(config.GetFSRepoPath())
 		cuc := carduc.New(cardRepo)

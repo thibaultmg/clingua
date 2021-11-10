@@ -10,7 +10,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/text/language"
 
-	"github.com/thibaultmg/clingua/internal/entity"
 	"github.com/thibaultmg/clingua/internal/repo/language/deepl"
 )
 
@@ -44,7 +43,7 @@ func TestDeepl_Nominal(t *testing.T) {
 	deeplRep, err := deepl.New(server.Client(), "authkey", server.URL, language.French, language.English)
 	assert.Nil(err)
 
-	res, err := deeplRep.GetTranslation(context.Background(), word, entity.Any)
+	res, err := deeplRep.Translate(context.Background(), word)
 	assert.Nil(err)
 	assert.Len(res, 1)
 	assert.Equal("Hallo, Welt!", res[0])

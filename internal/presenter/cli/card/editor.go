@@ -17,8 +17,9 @@ import (
 )
 
 var (
-	getDefinitionsTimeout  = 10 * time.Second
-	getTranslationsTimeout = 15 * time.Second
+	getDefinitionsTimeout   = 10 * time.Second
+	getTranslationsTimeout  = 30 * time.Second
+	sentenceExampleMinWords = 3
 )
 
 type CardField int
@@ -64,7 +65,6 @@ func (c CardField) Next() (CardField, bool) {
 
 type CardEditor struct {
 	card     *entity.Card
-	cache    map[string]interface{}
 	language language.LanguageUC
 	cardUC   card.CardUC
 }
@@ -72,7 +72,6 @@ type CardEditor struct {
 func NewCardEditor(card *entity.Card, lang language.LanguageUC, cardUC card.CardUC) *CardEditor {
 	return &CardEditor{
 		card:     card,
-		cache:    make(map[string]interface{}),
 		language: lang,
 		cardUC:   cardUC,
 	}
@@ -184,29 +183,26 @@ func (c *CardEditor) GetPropositions(field CardField, index int) ([]string, erro
 func (c *CardEditor) SetProposition(field CardField, index int) error {
 	switch field {
 	case DefinitionField:
-		cacheVal := c.mustGetCacheVal(DefinitionField)
-
-		defProps, ok := cacheVal.([]language.DefinitionEntry)
-		if !ok {
-			panic("invalid type assertion")
+		defProps, err := c.language.Define(context.Background(), c.card.Title, c.card.PartOfSpeech)
+		if err != nil {
+			return fmt.Errorf("failed to get definitions: %w", err)
 		}
 
-		err := c.SetField(DefinitionField, 0, defProps[index].Definition)
-		if err != nil {
-			log.Error().Err(err).Msg("failed to set field on card")
+		c.card.Definition = defProps[index].Definition
+		c.card.PartOfSpeech = defProps[index].PartOfSpeech
+
+		for _, e := range defProps[index].Examples {
+			if len(strings.Fields(e)) >= sentenceExampleMinWords {
+				c.card.Examples = append(c.card.Examples, e)
+			}
 		}
 	case TranslationField:
-		cacheVal := c.mustGetCacheVal(TranslationField)
-
-		transProps, ok := cacheVal.([]string)
-		if !ok {
-			panic("invalid type assertion from card editor cache")
-		}
-
-		err := c.SetField(TranslationField, index, transProps[index])
+		transRes, err := c.language.TranslateWord(context.Background(), c.card.Title, c.card.PartOfSpeech)
 		if err != nil {
-			log.Error().Err(err).Msg("failed to set field on card")
+			return fmt.Errorf("failed to get translations: %w", err)
 		}
+
+		c.card.Translations = append(c.card.Translations, transRes[index].Translation)
 	case ExampleField, TranslatedExampleField, NoField, TitleField:
 		return errors.New("not implemented")
 	default:
@@ -216,73 +212,20 @@ func (c *CardEditor) SetProposition(field CardField, index int) error {
 	return nil
 }
 
-func (c *CardEditor) mustGetCacheVal(field CardField) interface{} {
-	cachekey := c.makeCacheKey(field)
-
-	cacheVal, ok := c.cache[cachekey]
-	if !ok {
-		panic("invalid cache key" + cachekey)
-	}
-
-	return cacheVal
-}
-
-func (c *CardEditor) makeCacheKey(field CardField) string {
-	switch field {
-	case DefinitionField, TranslationField, ExampleField:
-		return field.String() + "_" + c.GetField(TitleField, 0)
-	default:
-		log.Error().Msg("cache key not implemented")
-
-		return field.String() + "_" + c.GetField(field, 0)
-	}
-}
-
-func (c *CardEditor) getCachedDefinitions() ([]language.DefinitionEntry, error) {
-	var ret []language.DefinitionEntry
-
-	cachekey := c.makeCacheKey(DefinitionField)
-
-	cacheVal, ok := c.cache[cachekey]
-	if !ok {
-		return ret, errors.New("failed to get cached definitions, no cache key")
-	}
-
-	ret, ok = cacheVal.([]language.DefinitionEntry)
-	if !ok {
-		return ret, errors.New("failed to cast cached definitions")
-	}
-
-	return ret, nil
-}
-
 func (c *CardEditor) getDefinitions() ([]string, error) {
 	var (
 		defProps []language.DefinitionEntry
 		ret      []string
 	)
 
-	cachekey := c.makeCacheKey(DefinitionField)
+	ctx, cancel := context.WithTimeout(context.Background(), getDefinitionsTimeout)
+	defer cancel()
 
-	cacheVal, ok := c.cache[cachekey]
-	if !ok {
-		ctx, cancel := context.WithTimeout(context.Background(), getDefinitionsTimeout)
-		defer cancel()
+	var err error
 
-		var err error
-
-		defProps, err = c.language.GetDefinition(ctx, c.card.Title, c.card.PartOfSpeech)
-		if err != nil {
-			return ret, fmt.Errorf("failed to get definitions: %w", err)
-		}
-
-		// Set cache
-		c.cache[cachekey] = defProps
-	} else {
-		defProps, ok = cacheVal.([]language.DefinitionEntry)
-		if !ok {
-			panic("invalid type assertion")
-		}
+	defProps, err = c.language.Define(ctx, c.card.Title, c.card.PartOfSpeech)
+	if err != nil {
+		return ret, fmt.Errorf("failed to get definitions: %w", err)
 	}
 
 	// Format props for screen print
@@ -311,29 +254,18 @@ func (c *CardEditor) getDefinitions() ([]string, error) {
 }
 
 func (c *CardEditor) getTranslations() ([]string, error) {
-	var ret []string
+	ctx, cancel := context.WithTimeout(context.Background(), getTranslationsTimeout)
+	defer cancel()
 
-	cachekey := c.makeCacheKey(TranslationField)
+	transRes, err := c.language.TranslateWord(ctx, c.card.Title, c.card.PartOfSpeech)
+	if err != nil {
+		return []string{}, fmt.Errorf("failed to get translations: %w", err)
+	}
 
-	cacheVal, ok := c.cache[cachekey]
-	if !ok {
-		ctx, cancel := context.WithTimeout(context.Background(), getTranslationsTimeout)
-		defer cancel()
+	ret := make([]string, 0, len(transRes))
 
-		var err error
-
-		ret, err = c.language.GetTranslation(ctx, c.card.Title, c.card.PartOfSpeech)
-		if err != nil {
-			return ret, fmt.Errorf("failed to get translations: %w", err)
-		}
-
-		// Set cache
-		c.cache[cachekey] = ret
-	} else {
-		ret, ok = cacheVal.([]string)
-		if !ok {
-			panic("invalid type assertion from card editor cache")
-		}
+	for _, e := range transRes {
+		ret = append(ret, fmt.Sprintf("%s\t— %s [%s]", e.Translation, e.PartOfSpeech, e.Meaning))
 	}
 
 	return ret, nil
@@ -342,12 +274,12 @@ func (c *CardEditor) getTranslations() ([]string, error) {
 func (c *CardEditor) setDefinitionField(val string, index int) {
 	c.card.Definition = val
 
-	defs, err := c.getCachedDefinitions()
+	defProps, err := c.language.Define(context.Background(), c.card.Title, c.card.PartOfSpeech)
 	if err != nil {
-		log.Error().Err(err).Msg("failed to get cached definition")
-	} else {
-		c.card.PartOfSpeech = defs[index].PartOfSpeech
+		log.Error().Err(err).Msg("failed to get definitions to set value in card")
 	}
+
+	c.card.PartOfSpeech = defProps[index].PartOfSpeech
 }
 
 func (c *CardEditor) setTranslationField(val string, index int) {

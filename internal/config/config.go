@@ -68,7 +68,11 @@ func GetFSRepoPath() string {
 
 func GetLanguages() (from, to language.Tag) {
 	from = language.MustParse(viper.GetString("fromLanguage"))
+
 	to = language.MustParse(viper.GetString("toLanguage"))
+	if to != language.English && to != language.AmericanEnglish && to != language.BritishEnglish {
+		panic("invalid to language, must be english variant")
+	}
 
 	return
 }

@@ -15,11 +15,13 @@ const (
 	Noun
 	Pronoun
 	Verb
+	PhrasalVerb
 	Adjective
 	Adverb
 	Preposition
 	Conjunction
 	Interjection
+	Idiom
 )
 
 func (p PartOfSpeech) IsAny() bool {
@@ -34,6 +36,8 @@ func (p PartOfSpeech) String() string {
 		return "pronoun"
 	case Verb:
 		return "verb"
+	case PhrasalVerb:
+		return "phrasal verb"
 	case Adjective:
 		return "adjective"
 	case Adverb:
@@ -44,6 +48,8 @@ func (p PartOfSpeech) String() string {
 		return "conjunction"
 	case Interjection:
 		return "interjection"
+	case Idiom:
+		return "idiom"
 	}
 
 	return ""
@@ -57,6 +63,8 @@ func ParsePartOfSpeech(pos string) (PartOfSpeech, error) {
 		return Pronoun, nil
 	case "verb":
 		return Verb, nil
+	case "phrasal verb":
+		return PhrasalVerb, nil
 	case "adjective":
 		return Adjective, nil
 	case "adverb":
@@ -67,6 +75,8 @@ func ParsePartOfSpeech(pos string) (PartOfSpeech, error) {
 		return Conjunction, nil
 	case "interjection":
 		return Interjection, nil
+	case "idiom":
+		return Idiom, nil
 	}
 
 	return 0, fmt.Errorf("error with value %s: %w", pos, ErrInvalidPartOfSpeech)

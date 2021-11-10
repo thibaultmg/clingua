@@ -10,21 +10,7 @@ import (
 	"net/url"
 
 	"golang.org/x/text/language"
-
-	"github.com/thibaultmg/clingua/internal/entity"
 )
-
-// curl https://api-free.deepl.com/v2/translate \
-// 	-d auth_key=5106829b-9ffd-8118-1cbe-0c75a5bb9b2d:fx \
-// 	-d "text=Hello, world!"  \
-// 	-d "target_lang=DE"
-
-// {
-// 	"translations": [{
-// 		"detected_source_language":"EN",
-// 		"text":"Hallo, Welt!"
-// 	}]
-// }
 
 type Response struct {
 	Translations []Translation `json:"translations"`
@@ -58,7 +44,7 @@ func New(client *http.Client, authKey string, baseURL string, from, to language.
 	}, nil
 }
 
-func (r Repo) GetTranslation(ctx context.Context, text string, pos entity.PartOfSpeech) ([]string, error) {
+func (r Repo) Translate(ctx context.Context, text string) ([]string, error) {
 	reqURL := fmt.Sprintf("/v2/translate?auth_key=%s&text=%s&source_lang=%s&target_lang=%s&split_sentences=0",
 		r.authKey, text, r.fromLang, r.toLang)
 

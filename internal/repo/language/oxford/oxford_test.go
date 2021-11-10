@@ -45,7 +45,7 @@ func TestOxford_Nominal(t *testing.T) {
 	oxRep, err := oxford.New(server.Client(), server.URL, "appid", "appkey", language.English)
 	assert.Nil(err)
 
-	res, err := oxRep.GetDefinition(context.Background(), word, entity.Any)
+	res, err := oxRep.Define(context.Background(), word, entity.Any)
 	assert.Nil(err)
 	assert.Len(res, 2)
 }

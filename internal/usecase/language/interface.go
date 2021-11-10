@@ -9,16 +9,32 @@ import (
 )
 
 type Dictionary interface {
-	GetDefinition(context.Context, string, entity.PartOfSpeech) ([]DefinitionEntry, error)
+	Define(context.Context, string, entity.PartOfSpeech) ([]DefinitionEntry, error)
 }
 
 type Translator interface {
-	GetTranslation(context.Context, string, entity.PartOfSpeech) ([]string, error)
+	Translate(context.Context, string) ([]string, error)
+}
+
+type WordTranslator interface {
+	TranslateWord(context.Context, string, entity.PartOfSpeech) ([]WordTranslationEntry, error)
+}
+
+type Sentences interface {
+	Sentences(context.Context, string) ([]string, error)
 }
 
 type LanguageUC interface {
-	GetDefinition(context.Context, string, entity.PartOfSpeech) ([]DefinitionEntry, error)
-	GetTranslation(context.Context, string, entity.PartOfSpeech) ([]string, error)
+	Dictionary
+	Translator
+	WordTranslator
+	Sentences
+}
+
+type WordTranslationEntry struct {
+	PartOfSpeech entity.PartOfSpeech
+	Translation  string
+	Meaning      string
 }
 
 type DefinitionEntry struct {

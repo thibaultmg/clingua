@@ -42,7 +42,7 @@ func New(client *http.Client, baseURL, appID, appKey string, to language.Tag) (R
 }
 
 //nolint:funlen
-func (r Repo) GetDefinition(ctx context.Context, word string, pos entity.PartOfSpeech) ([]languageuc.DefinitionEntry, error) {
+func (r Repo) Define(ctx context.Context, word string, pos entity.PartOfSpeech) ([]languageuc.DefinitionEntry, error) {
 	var ret []languageuc.DefinitionEntry
 
 	var reqURL strings.Builder
