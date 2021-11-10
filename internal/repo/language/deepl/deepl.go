@@ -12,6 +12,10 @@ import (
 	"golang.org/x/text/language"
 )
 
+type HTTPDoClient interface {
+	Do(req *http.Request) (*http.Response, error)
+}
+
 type Response struct {
 	Translations []Translation `json:"translations"`
 }
@@ -22,20 +26,20 @@ type Translation struct {
 }
 
 type Repo struct {
-	client   *http.Client
+	client   HTTPDoClient
 	authKey  string
 	baseURL  *url.URL
 	fromLang language.Tag
 	toLang   language.Tag
 }
 
-func New(client *http.Client, authKey string, baseURL string, from, to language.Tag) (Repo, error) {
+func New(client HTTPDoClient, authKey string, baseURL string, from, to language.Tag) (*Repo, error) {
 	u, err := url.Parse(baseURL)
 	if err != nil {
-		return Repo{}, err
+		return &Repo{}, err
 	}
 
-	return Repo{
+	return &Repo{
 		client:   client,
 		authKey:  authKey,
 		baseURL:  u,
@@ -44,7 +48,7 @@ func New(client *http.Client, authKey string, baseURL string, from, to language.
 	}, nil
 }
 
-func (r Repo) Translate(ctx context.Context, text string) ([]string, error) {
+func (r *Repo) Translate(ctx context.Context, text string) ([]string, error) {
 	reqURL := fmt.Sprintf("/v2/translate?auth_key=%s&text=%s&source_lang=%s&target_lang=%s&split_sentences=0",
 		r.authKey, text, r.fromLang, r.toLang)
 

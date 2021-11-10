@@ -3,7 +3,6 @@ Cli tool for managing language vocabulary lists and learning them. Allows learni
 
 # TODO
 
-- add cache mecanism for repos
 - handle multiple fields edition (translations, examples)
 - add word examples repo with oxford learners dict
 - integrate word examples repo Oxford to UC and presenter

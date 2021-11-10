@@ -15,32 +15,37 @@ import (
 	"golang.org/x/net/html/atom"
 
 	"github.com/rs/zerolog/log"
+
 	"github.com/thibaultmg/clingua/internal/entity"
 	"github.com/thibaultmg/clingua/internal/usecase/language"
 )
 
 const baseURL = "https://www.larousse.fr/dictionnaires/anglais-francais/"
 
-// Larousse repo returns single words translations.
-type LarousseRepo struct {
-	BaseURL    *url.URL
-	httpClient *http.Client
+type HTTPDoClient interface {
+	Do(req *http.Request) (*http.Response, error)
 }
 
-func New(httpClient *http.Client) *LarousseRepo {
+// Larousse repo returns single words translations.
+type Repo struct {
+	BaseURL    *url.URL
+	httpClient HTTPDoClient
+}
+
+func New(httpClient HTTPDoClient) *Repo {
 	u, err := url.Parse(baseURL)
 	if err != nil {
 		panic("invalid base url")
 	}
 
-	return &LarousseRepo{
+	return &Repo{
 		httpClient: httpClient,
 		BaseURL:    u,
 	}
 }
 
 //nolint:lll
-func (l *LarousseRepo) TranslateWord(ctx context.Context, rawWord string, pos entity.PartOfSpeech) ([]language.WordTranslationEntry, error) {
+func (l *Repo) TranslateWord(ctx context.Context, rawWord string, pos entity.PartOfSpeech) ([]language.WordTranslationEntry, error) {
 	word := strings.ReplaceAll(strings.TrimSpace(strings.ToLower(rawWord)), " ", "_")
 
 	wordURL := *l.BaseURL
@@ -187,11 +192,11 @@ func response2WordTranslations(res responseData) []language.WordTranslationEntry
 		if err != nil {
 			if strings.Contains(pos.PartOfSpeech, "verb") {
 				posVal = entity.Verb
+			} else {
+				log.Debug().Msgf("invalid pos value %s", pos.PartOfSpeech)
+
+				continue
 			}
-
-			log.Debug().Msgf("invalid pos value %s", pos.PartOfSpeech)
-
-			continue
 		}
 
 		for _, item := range pos.Items {
@@ -272,8 +277,7 @@ func renderNode(n *html.Node) string {
 	var buf bytes.Buffer
 	w := io.Writer(&buf)
 
-	err := html.Render(w, n)
-	if err != nil {
+	if err := html.Render(w, n); err != nil {
 		panic("failed to render node: " + err.Error())
 	}
 

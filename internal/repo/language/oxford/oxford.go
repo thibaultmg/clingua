@@ -18,21 +18,25 @@ import (
 	languageuc "github.com/thibaultmg/clingua/internal/usecase/language"
 )
 
+type HTTPDoClient interface {
+	Do(req *http.Request) (*http.Response, error)
+}
+
 type Repo struct {
 	baseURL *url.URL
 	appID   string
 	appKey  string
-	client  *http.Client
+	client  HTTPDoClient
 	toLang  language.Tag
 }
 
-func New(client *http.Client, baseURL, appID, appKey string, to language.Tag) (Repo, error) {
+func New(client HTTPDoClient, baseURL, appID, appKey string, to language.Tag) (*Repo, error) {
 	u, err := url.Parse(baseURL)
 	if err != nil {
-		return Repo{}, err
+		return &Repo{}, err
 	}
 
-	return Repo{
+	return &Repo{
 		baseURL: u,
 		appID:   appID,
 		appKey:  appKey,
@@ -42,7 +46,7 @@ func New(client *http.Client, baseURL, appID, appKey string, to language.Tag) (R
 }
 
 //nolint:funlen
-func (r Repo) Define(ctx context.Context, word string, pos entity.PartOfSpeech) ([]languageuc.DefinitionEntry, error) {
+func (r *Repo) Define(ctx context.Context, word string, pos entity.PartOfSpeech) ([]languageuc.DefinitionEntry, error) {
 	var ret []languageuc.DefinitionEntry
 
 	var reqURL strings.Builder
