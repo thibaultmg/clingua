@@ -17,6 +17,7 @@ import (
 var testCard = card{
 	FromLanguage: "fr",
 	ToLanguage:   "en",
+	ID:           "myID",
 }
 
 func TestFSRepo_Get(t *testing.T) {
@@ -32,13 +33,11 @@ func TestFSRepo_Get(t *testing.T) {
 	defer os.RemoveAll(tempDir)
 
 	// Write valid card in dir
-	fileID := "myValidCard"
-	err = os.WriteFile(path.Join(tempDir, fileID+".yaml"), d, 0o640)
+	err = os.WriteFile(path.Join(tempDir, "myValidCard.yaml"), d, 0o640)
 	assert.Nil(err)
 
-	// Write invalid card in dir
-	invalidFileID := "invalidCard"
-	err = os.WriteFile(path.Join(tempDir, invalidFileID+".yaml"), []byte("blablabla"), 0o640)
+	// Write invalid card in dir to ensure that it is well handled by the repo
+	err = os.WriteFile(path.Join(tempDir, "invalidCard.yaml"), []byte("blablabla"), 0o640)
 	assert.Nil(err)
 
 	fsrepo := New(tempDir)
@@ -48,13 +47,8 @@ func TestFSRepo_Get(t *testing.T) {
 	assert.NotNil(err)
 	assert.True(errors.Is(err, common.ErrNotFound))
 
-	// get invalid yaml file
-	_, err = fsrepo.Get(context.Background(), invalidFileID)
-	assert.NotNil(err)
-	assert.True(errors.As(err, &common.ErrInternalError{}))
-
 	// get valid yaml file
-	cardData, err := fsrepo.Get(context.Background(), fileID)
+	cardData, err := fsrepo.Get(context.Background(), testCard.ID)
 	assert.Nil(err)
 	assert.Equal(cardData.From.String(), testCard.FromLanguage)
 }
@@ -68,21 +62,25 @@ func TestFSRepo_Delete(t *testing.T) {
 
 	defer os.RemoveAll(tempDir)
 
-	fileID := "myFile"
-	err = os.WriteFile(path.Join(tempDir, fileID+".yaml"), []byte("blablablagarbage"), 0o640)
+	d, err := yaml.Marshal(&testCard)
+	assert.Nil(err)
+
+	filename := "afile.yaml"
+	err = os.WriteFile(path.Join(tempDir, filename), d, 0o640)
 	assert.Nil(err)
 
 	fsrepo := New(tempDir)
 
-	// delete non existing file
+	// delete non existing id
 	err = fsrepo.Delete(context.Background(), "invalid")
 	assert.NotNil(err)
 	assert.True(errors.Is(err, common.ErrNotFound))
 
-	// delete existing file
-	err = fsrepo.Delete(context.Background(), fileID)
+	// delete existing id
+	err = fsrepo.Delete(context.Background(), testCard.ID)
 	assert.Nil(err)
-	_, err = os.ReadFile(path.Join(tempDir, fileID+".yaml"))
+
+	_, err = os.ReadFile(path.Join(tempDir, filename))
 	assert.NotNil(err)
 	assert.ErrorIs(err, fs.ErrNotExist)
 }
@@ -105,16 +103,16 @@ func TestFSRepo_Create(t *testing.T) {
 	assert.Nil(err)
 	assert.True(len(cardID) > 0)
 
-	// Create card with same title
-	cardID, err = fsrepo.Create(context.Background(), mycard.ToEntity())
-	assert.Nil(err)
-	assert.True(len(cardID) > 0)
+	// Create card with same id
+	_, err = fsrepo.Create(context.Background(), mycard.ToEntity())
+	assert.NotNil(err)
+	assert.ErrorIs(err, common.ErrAlreadyExists)
 
-	// Create card with no title
-	mycard.Title = ""
+	// Create card with no id
+	mycard.ID = ""
 	cardID, err = fsrepo.Create(context.Background(), mycard.ToEntity())
 	assert.Nil(err)
-	assert.True(len(cardID) > 0)
+	assert.Equal(cardID, mycard.ID)
 }
 
 func TestFSRepo_List(t *testing.T) {
@@ -175,4 +173,30 @@ func TestFSRepo_List(t *testing.T) {
 	assert.Equal(cardAce.Title, cardsList[0].Title)
 	assert.Equal(cardBoat.Title, cardsList[1].Title)
 	assert.Equal(cardCar.Title, cardsList[2].Title)
+}
+
+func TestFSRepo_Cache(t *testing.T) {
+	assert := assert.New(t)
+	t.Parallel()
+
+	tempDir, err := os.MkdirTemp("", "fsrepo_test_dir")
+	assert.Nil(err)
+
+	defer os.RemoveAll(tempDir)
+
+	fsrepo := New(tempDir)
+
+	_, err = fsrepo.Create(context.Background(), testCard.ToEntity())
+	assert.Nil(err)
+
+	// Test that cache is filled with new entry
+	_, err = fsrepo.Get(context.Background(), testCard.ID)
+	assert.Nil(err)
+
+	// Delete entry and check that it is removed from cache
+	err = fsrepo.Delete(context.Background(), testCard.ID)
+	assert.Nil(err)
+
+	_, err = fsrepo.Get(context.Background(), testCard.ID)
+	assert.NotNil(err)
 }

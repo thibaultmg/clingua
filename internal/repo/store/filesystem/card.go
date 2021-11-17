@@ -63,6 +63,7 @@ func entityToCard(ecard *entity.Card) card {
 	for _, e := range ecard.Examples {
 		examples = append(examples, example{Example: e.Example, Translation: e.Translation})
 	}
+
 	return card{
 		ID:           ecard.ID,
 		FromLanguage: ecard.From.String(),

@@ -70,8 +70,16 @@ func NewCardCLI(ce *CardEditor) *CardCLI {
 				Src:  []string{string(writeFieldState), string(selectPropositionState), string(editCardState), string(initState)},
 				Dst:  string(editFieldState),
 			},
-			{Name: string(editCardEvent), Src: []string{string(listCardsState), string(editFieldState), string(saveCardState)}, Dst: string(editCardState)},
-			{Name: string(selectPropositionEvent), Src: []string{string(editFieldState), string(editExampleState)}, Dst: string(selectPropositionState)},
+			{
+				Name: string(editCardEvent),
+				Src:  []string{string(listCardsState), string(editFieldState), string(saveCardState)},
+				Dst:  string(editCardState),
+			},
+			{
+				Name: string(selectPropositionEvent),
+				Src:  []string{string(editFieldState), string(editExampleState)},
+				Dst:  string(selectPropositionState),
+			},
 			{Name: string(writeFieldEvent), Src: []string{string(editFieldState), string(editExampleState)}, Dst: string(writeFieldState)},
 			{Name: string(quitEvent), Src: []string{string(editCardState)}, Dst: string(endState)},
 			{Name: string(listCardsEvent), Src: []string{string(editCardState), string(initState)}, Dst: string(listCardsState)},
@@ -197,6 +205,7 @@ func printMaxChars(s string, maxCount int) string {
 
 func (c *CardCLI) listCards(e *fsm.Event) {
 	cardsList := c.ce.ListCards()
+
 	items, err := formatCardsList(cardsList)
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to format cards list")
@@ -298,6 +307,7 @@ func (c *CardCLI) editFieldPrompt(e *fsm.Event) {
 
 	if c.activeField == ExampleField || c.activeField == TranslatedExampleField {
 		c.sendEvent(editExampleEvent)
+
 		return
 	}
 
@@ -407,6 +417,7 @@ func (c *CardCLI) selectExampleMenu(e *fsm.Event) {
 	if len(c.ce.card.Examples) == 0 {
 		c.sendEvent(editExampleEvent)
 		c.activeFieldIndex = 0
+
 		return
 	}
 
@@ -414,6 +425,7 @@ func (c *CardCLI) selectExampleMenu(e *fsm.Event) {
 
 	label := "Select example"
 	items := make([]string, 0, len(c.ce.card.Examples)+1)
+
 	for i := range c.ce.card.Examples {
 		items = append(items, strconv.Itoa(i+1))
 	}
@@ -436,7 +448,6 @@ func (c *CardCLI) selectExampleMenu(e *fsm.Event) {
 	default:
 		c.activeFieldIndex = resultIdx
 		c.sendEvent(editExampleEvent)
-		// log.Error().Msgf("Invalid prompt index %d", resultIdx)
 	}
 }
 

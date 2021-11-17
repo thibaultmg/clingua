@@ -2,7 +2,7 @@ package httpmemo
 
 import (
 	"bytes"
-	"crypto/sha1"
+	"crypto/sha1" // nolint:gosec
 	"errors"
 	"fmt"
 	"io"
@@ -67,8 +67,10 @@ func (h *HTTPMemo) Do(req *http.Request) (*http.Response, error) {
 }
 
 func makeRequestHash(req *http.Request) string {
-	var body []byte
-	var err error
+	var (
+		body []byte
+		err  error
+	)
 
 	if req.Body != nil {
 		defer req.Body.Close()
@@ -81,10 +83,21 @@ func makeRequestHash(req *http.Request) string {
 		req.Body = io.NopCloser(bytes.NewReader(body))
 	}
 
-	h := sha1.New()
-	io.WriteString(h, req.Method)
-	io.WriteString(h, req.URL.String())
-	io.WriteString(h, string(body))
+	h := sha1.New() // nolint:gosec
+	_, err = io.WriteString(h, req.Method)
+	checkErr(err)
+
+	_, err = io.WriteString(h, req.URL.String())
+	checkErr(err)
+
+	_, err = io.WriteString(h, string(body))
+	checkErr(err)
 
 	return fmt.Sprintf("%x", h.Sum(nil))
+}
+
+func checkErr(err error) {
+	if err != nil {
+		log.Error().Err(err).Msg("failed to write string into hash writer")
+	}
 }

@@ -227,6 +227,7 @@ func (c *CardEditor) GetPropositions(field CardField, index int) ([]string, erro
 		val := c.GetField(ExampleField, index)
 		if len(val) == 0 {
 			log.Warn().Msg("empty example, cannot translate")
+
 			return []string{}, nil
 		}
 
