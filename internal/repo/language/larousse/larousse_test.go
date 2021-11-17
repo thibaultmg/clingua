@@ -36,6 +36,8 @@ func TestLarousse_TranslateWord(t *testing.T) {
 		assert.Nil(writeErr)
 	}))
 
+	defer server.Close()
+
 	larousseRepo := larousse.New(server.Client())
 	u, _ := url.Parse(server.URL + apiBasePath)
 	larousseRepo.BaseURL = u

@@ -37,7 +37,6 @@ func New(root string) *FSRepo {
 // Get returns the Card having the ID id, which is its file path.
 func (f *FSRepo) Get(ctx context.Context, id string) (entity.Card, error) {
 	fileData, err := os.ReadFile(path.Join(f.root, id+yamlExtension))
-	// fileData, err := fs.ReadFile(f.fs, id)
 	if err != nil {
 		if errors.Is(err, fs.ErrNotExist) {
 			return entity.Card{}, common.ErrNotFound

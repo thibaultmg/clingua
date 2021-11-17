@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strings"
 
 	"golang.org/x/text/language"
 )
@@ -39,6 +40,8 @@ func New(client HTTPDoClient, authKey string, baseURL string, from, to language.
 		return &Repo{}, err
 	}
 
+	u.Path = "/v2/translate"
+
 	return &Repo{
 		client:   client,
 		authKey:  authKey,
@@ -49,20 +52,19 @@ func New(client HTTPDoClient, authKey string, baseURL string, from, to language.
 }
 
 func (r *Repo) Translate(ctx context.Context, text string) ([]string, error) {
-	reqURL := fmt.Sprintf("/v2/translate?auth_key=%s&text=%s&source_lang=%s&target_lang=%s&split_sentences=0",
-		r.authKey, text, r.fromLang, r.toLang)
+	params := url.Values{}
+	params.Add("text", text)
+	params.Add("target_lang", r.toLang.String())
+	params.Add("source_lang", r.fromLang.String())
 
-	uriRef, err := url.Parse(reqURL)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, r.baseURL.String(), strings.NewReader(params.Encode()))
 	if err != nil {
 		return []string{}, err
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, r.baseURL.ResolveReference(uriRef).String(), nil)
-	if err != nil {
-		return []string{}, err
-	}
-
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Add("Accept", "application/json")
+	req.Header.Add("Authorization", "DeepL-Auth-Key "+r.authKey)
 
 	resp, err := r.client.Do(req)
 	if err != nil {

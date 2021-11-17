@@ -58,6 +58,8 @@ func (c CardField) Next() (CardField, bool) {
 		return TranslationField, true
 	case TranslationField:
 		return ExampleField, true
+	case ExampleField:
+		return TranslatedExampleField, true
 	default:
 		return NoField, false
 	}
@@ -115,8 +117,36 @@ func (c *CardEditor) GetField(field CardField, index int) string {
 		return c.card.Title
 	case DefinitionField:
 		return c.card.Definition
-	case TranslationField, ExampleField, TranslatedExampleField:
-		return c.getFieldWithIndex(field, index)
+	case TranslationField:
+		if len(c.card.Translations) == 0 {
+			return ""
+		}
+
+		if index >= len(c.card.Translations) || index < 0 {
+			log.Error().Msgf("invalid index %d for field %v", index, field)
+		}
+
+		return c.card.Translations[index]
+	case ExampleField:
+		if len(c.card.Examples) == 0 {
+			return ""
+		}
+
+		if index >= len(c.card.Examples) || index < 0 {
+			log.Error().Msgf("invalid index %d for field %v", index, field)
+		}
+
+		return c.card.Examples[index].Example
+	case TranslatedExampleField:
+		if len(c.card.Examples) == 0 {
+			return ""
+		}
+
+		if index >= len(c.card.Examples) || index < 0 {
+			log.Error().Msgf("invalid index %d for field %v", index, field)
+		}
+
+		return c.card.Examples[index].Translation
 	default:
 		log.Warn().Msgf("invalid get field %v", field)
 
@@ -133,11 +163,21 @@ func (c *CardEditor) SetField(field CardField, index int, val string) error {
 	case TranslationField:
 		c.setTranslationField(val, index)
 	case ExampleField:
-		// TODO: handle index
-		c.card.Examples[index] = val
+		if len(c.card.Examples) == 0 || index == len(c.card.Examples) {
+			c.card.Examples = append(c.card.Examples, entity.Example{Example: val})
+		} else if index >= 0 && index < len(c.card.Examples) {
+			c.card.Examples[index].Example = val
+		} else {
+			log.Error().Msgf("invalid example index %d", index)
+		}
 	case TranslatedExampleField:
-		// TODO: handle index
-		c.card.ExamplesTranslations[index] = val
+		if len(c.card.Examples) == 0 || index == len(c.card.Examples) {
+			c.card.Examples = append(c.card.Examples, entity.Example{Translation: val})
+		} else if index >= 0 && index < len(c.card.Examples) {
+			c.card.Examples[index].Translation = val
+		} else {
+			log.Error().Msgf("invalid example index %d", index)
+		}
 	default:
 		return fmt.Errorf("invalid index %d on field %s", index, field)
 	}
@@ -145,9 +185,10 @@ func (c *CardEditor) SetField(field CardField, index int, val string) error {
 	return nil
 }
 
-func (c CardEditor) Print(field CardField) {
+func (c CardEditor) Print(field CardField, index int) {
 	tFuncs := template.FuncMap{
 		"join": strings.Join,
+		"add":  func(i, j int) int { return i + j },
 	}
 
 	var t *template.Template
@@ -161,6 +202,13 @@ func (c CardEditor) Print(field CardField) {
 		t = template.Must(template.New("definition").Parse(definitionTemplate))
 	case TranslationField:
 		t = template.Must(template.New("translation").Funcs(tFuncs).Parse(translationTemplate))
+	case ExampleField, TranslatedExampleField:
+		if index == -1 {
+			t = template.Must(template.New("example").Funcs(tFuncs).Parse(exemplesTemplate))
+		} else {
+			tFuncs["getIndex"] = func() int { return index }
+			t = template.Must(template.New("example").Funcs(tFuncs).Parse(exempleTemplate))
+		}
 	}
 
 	err := t.Execute(os.Stdout, c.card)
@@ -175,12 +223,20 @@ func (c *CardEditor) GetPropositions(field CardField, index int) ([]string, erro
 		return c.getDefinitions()
 	case TranslationField:
 		return c.getTranslations()
+	case TranslatedExampleField:
+		val := c.GetField(ExampleField, index)
+		if len(val) == 0 {
+			log.Warn().Msg("empty example, cannot translate")
+			return []string{}, nil
+		}
+
+		return c.language.Translate(context.Background(), val)
 	default:
 		return []string{}, fmt.Errorf("invalid field %s or index %d", field, index)
 	}
 }
 
-func (c *CardEditor) SetProposition(field CardField, index int) error {
+func (c *CardEditor) SetProposition(field CardField, fieldIndex, index int) error {
 	switch field {
 	case DefinitionField:
 		defProps, err := c.language.Define(context.Background(), c.card.Title, c.card.PartOfSpeech)
@@ -193,17 +249,26 @@ func (c *CardEditor) SetProposition(field CardField, index int) error {
 
 		for _, e := range defProps[index].Examples {
 			if len(strings.Fields(e)) >= sentenceExampleMinWords {
-				c.card.Examples = append(c.card.Examples, e)
+				c.card.Examples = append(c.card.Examples, entity.Example{Example: e})
 			}
 		}
 	case TranslationField:
-		transRes, err := c.language.TranslateWord(context.Background(), c.card.Title, c.card.PartOfSpeech)
+		transRes, err := c.translate()
 		if err != nil {
 			return fmt.Errorf("failed to get translations: %w", err)
 		}
 
-		c.card.Translations = append(c.card.Translations, transRes[index].Translation)
-	case ExampleField, TranslatedExampleField, NoField, TitleField:
+		c.card.Translations = append(c.card.Translations, transRes[index])
+	case TranslatedExampleField:
+		val := c.GetField(ExampleField, fieldIndex)
+
+		res, err := c.language.Translate(context.Background(), val)
+		if err != nil {
+			return err
+		}
+
+		c.SetField(field, fieldIndex, res[index])
+	case ExampleField:
 		return errors.New("not implemented")
 	default:
 		return errors.New("not implemented")
@@ -254,12 +319,20 @@ func (c *CardEditor) getDefinitions() ([]string, error) {
 }
 
 func (c *CardEditor) getTranslations() ([]string, error) {
+	if len(strings.Fields(c.card.Title)) > 1 {
+		return c.translate()
+	} else {
+		return c.translateWord()
+	}
+}
+
+func (c *CardEditor) translateWord() ([]string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), getTranslationsTimeout)
 	defer cancel()
 
 	transRes, err := c.language.TranslateWord(ctx, c.card.Title, c.card.PartOfSpeech)
 	if err != nil {
-		return []string{}, fmt.Errorf("failed to get translations: %w", err)
+		return nil, fmt.Errorf("failed to get translations: %w", err)
 	}
 
 	ret := make([]string, 0, len(transRes))
@@ -269,6 +342,18 @@ func (c *CardEditor) getTranslations() ([]string, error) {
 	}
 
 	return ret, nil
+}
+
+func (c *CardEditor) translate() ([]string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), getTranslationsTimeout)
+	defer cancel()
+
+	transRes, err := c.language.Translate(ctx, c.card.Title)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get translations: %w", err)
+	}
+
+	return transRes, nil
 }
 
 func (c *CardEditor) setDefinitionField(val string, index int) {
@@ -291,29 +376,4 @@ func (c *CardEditor) setTranslationField(val string, index int) {
 	default:
 		c.card.Translations[index] = val
 	}
-}
-
-func (c *CardEditor) getFieldWithIndex(fieldType CardField, index int) string {
-	var fieldValue []string
-
-	switch fieldType {
-	case TranslationField:
-		fieldValue = c.card.Translations
-	case ExampleField:
-		fieldValue = c.card.Examples
-	case TranslatedExampleField:
-		fieldValue = c.card.ExamplesTranslations
-	default:
-		log.Error().Msgf("invalid indexed field type %s", fieldType)
-
-		return ""
-	}
-
-	if index >= len(fieldValue) {
-		log.Error().Msgf("invalid index %d for field %v", index, fieldType)
-
-		return ""
-	}
-
-	return fieldValue[index]
 }

@@ -2,6 +2,7 @@ package deepl_test
 
 import (
 	"context"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -27,10 +28,20 @@ func TestDeepl_Nominal(t *testing.T) {
 	t.Parallel()
 
 	word := "ace"
+	authKey := "myauthkey"
 
 	server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
 		// Test url path
 		assert.True(strings.HasPrefix(req.URL.String(), "/v2/translate"))
+
+		// Test auth key
+		authHeader := req.Header.Get("Authorization")
+		assert.Contains(authHeader, authKey)
+
+		// Test payload
+		payload, err := io.ReadAll(req.Body)
+		assert.Nil(err)
+		assert.Contains(string(payload), "text="+word)
 
 		// Send mocked response
 		_, writeErr := rw.Write([]byte(testResponse))
@@ -40,7 +51,7 @@ func TestDeepl_Nominal(t *testing.T) {
 	defer server.Close()
 
 	// Test repo with mocked server
-	deeplRep, err := deepl.New(server.Client(), "authkey", server.URL, language.French, language.English)
+	deeplRep, err := deepl.New(server.Client(), authKey, server.URL, language.French, language.English)
 	assert.Nil(err)
 
 	res, err := deeplRep.Translate(context.Background(), word)

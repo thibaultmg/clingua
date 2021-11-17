@@ -7,16 +7,20 @@ import (
 const maxTranslations = 3
 
 type Card struct {
-	From                 language.Tag // Learner's language
-	To                   language.Tag // Learned language
-	ID                   string
-	Title                string
-	PartOfSpeech         PartOfSpeech
-	Register             string
-	Definition           string
-	Examples             []string
-	ExamplesTranslations []string
-	Translations         []string
+	From         language.Tag // Learner's language
+	To           language.Tag // Learned language
+	ID           string
+	Title        string
+	PartOfSpeech PartOfSpeech
+	Register     string
+	Definition   string
+	Examples     []Example
+	Translations []string
+}
+
+type Example struct {
+	Example     string
+	Translation string
 }
 
 func NewCard() Card {

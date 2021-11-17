@@ -16,6 +16,25 @@ Translations: {{join .Translations ", "}}
 ---------------------------
 `
 
+var exempleTemplate = `
+----- Vocabulary Card -----
+Title: {{ .Title }}
+{{ if gt (len .Examples) 0 -}}
+Examples: {{ index .Examples (getIndex) }}
+{{ else -}}
+Examples:
+{{end}}
+---------------------------
+`
+
+var exemplesTemplate = `
+----- Vocabulary Card -----
+Title: {{ .Title }}
+Examples: {{ range $index, $element := .Examples}}
+	[{{add $index 1}}] — {{ $element }}{{end}}
+---------------------------
+`
+
 var titleTemplate = `
 ----- Vocabulary Card -----
 Title: {{ .Title }}
@@ -28,6 +47,8 @@ Title: {{ .Title }}
 Part Of Speech: {{ print .PartOfSpeech }}
 Definition: {{ .Definition }}
 Translations: {{join .Translations ", "}}
+Examples: {{ range $index, $element := .Examples}}
+	[{{add $index 1}}] — {{ $element.Example }}; {{ $element.Translation }}{{end}}
 ---------------------------
 `
 

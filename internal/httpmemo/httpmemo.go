@@ -2,7 +2,9 @@ package httpmemo
 
 import (
 	"bytes"
+	"crypto/sha1"
 	"errors"
+	"fmt"
 	"io"
 	"net"
 	"net/http"
@@ -65,5 +67,24 @@ func (h *HTTPMemo) Do(req *http.Request) (*http.Response, error) {
 }
 
 func makeRequestHash(req *http.Request) string {
-	return req.Method + ":" + req.URL.Redacted()
+	var body []byte
+	var err error
+
+	if req.Body != nil {
+		defer req.Body.Close()
+
+		body, err = io.ReadAll(req.Body)
+		if err != nil {
+			log.Error().Err(err).Msg("failed to read request body")
+		}
+
+		req.Body = io.NopCloser(bytes.NewReader(body))
+	}
+
+	h := sha1.New()
+	io.WriteString(h, req.Method)
+	io.WriteString(h, req.URL.String())
+	io.WriteString(h, string(body))
+
+	return fmt.Sprintf("%x", h.Sum(nil))
 }

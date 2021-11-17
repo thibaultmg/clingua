@@ -8,16 +8,20 @@ import (
 )
 
 type card struct {
-	ID                   string
-	FromLanguage         string
-	ToLanguage           string
-	Title                string
-	PartOfSpeech         string
-	Register             string
-	Definition           string
-	Translations         []string
-	Examples             []string
-	ExamplesTranslations []string
+	ID           string
+	FromLanguage string
+	ToLanguage   string
+	Title        string
+	PartOfSpeech string
+	Register     string
+	Definition   string
+	Translations []string
+	Examples     []example
+}
+
+type example struct {
+	Example     string
+	Translation string
 }
 
 func (c card) ToEntity() entity.Card {
@@ -36,31 +40,38 @@ func (c card) ToEntity() entity.Card {
 	from := language.MustParse(c.FromLanguage)
 	to := language.MustParse(c.ToLanguage)
 
+	examples := make([]entity.Example, 0, len(c.Examples))
+	for _, e := range c.Examples {
+		examples = append(examples, entity.Example{Example: e.Example, Translation: e.Translation})
+	}
+
 	return entity.Card{
-		ID:                   c.ID,
-		From:                 from,
-		To:                   to,
-		Title:                c.Title,
-		PartOfSpeech:         pos,
-		Register:             c.Register,
-		Definition:           c.Definition,
-		Examples:             c.Examples,
-		ExamplesTranslations: c.ExamplesTranslations,
-		Translations:         c.Translations,
+		ID:           c.ID,
+		From:         from,
+		To:           to,
+		Title:        c.Title,
+		PartOfSpeech: pos,
+		Register:     c.Register,
+		Definition:   c.Definition,
+		Examples:     examples,
+		Translations: c.Translations,
 	}
 }
 
 func entityToCard(ecard *entity.Card) card {
+	examples := make([]example, 0, len(ecard.Examples))
+	for _, e := range ecard.Examples {
+		examples = append(examples, example{Example: e.Example, Translation: e.Translation})
+	}
 	return card{
-		ID:                   ecard.ID,
-		FromLanguage:         ecard.From.String(),
-		ToLanguage:           ecard.To.String(),
-		Title:                ecard.Title,
-		PartOfSpeech:         ecard.PartOfSpeech.String(),
-		Register:             ecard.Register,
-		Definition:           ecard.Definition,
-		Translations:         ecard.Translations,
-		Examples:             ecard.Examples,
-		ExamplesTranslations: ecard.ExamplesTranslations,
+		ID:           ecard.ID,
+		FromLanguage: ecard.From.String(),
+		ToLanguage:   ecard.To.String(),
+		Title:        ecard.Title,
+		PartOfSpeech: ecard.PartOfSpeech.String(),
+		Register:     ecard.Register,
+		Definition:   ecard.Definition,
+		Translations: ecard.Translations,
+		Examples:     examples,
 	}
 }
